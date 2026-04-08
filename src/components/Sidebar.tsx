@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -13,7 +14,6 @@ import {
   LogOut,
   Menu,
   X,
-  Rocket,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -75,13 +75,17 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
         )}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 p-6 border-b border-white/10">
-          <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center">
-            <Rocket className="w-5 h-5 text-white" />
-          </div>
+        <div className="flex items-center gap-3 p-5 border-b border-white/10">
+          <Image
+            src="/logo_rocketmidia.jpg"
+            alt="Rocket Marketing"
+            width={44}
+            height={44}
+            className="rounded-full"
+          />
           <div>
-            <h1 className="font-bold text-lg">Rocket Mídia</h1>
-            <p className="text-xs text-white/60">CRM</p>
+            <h1 className="font-bold text-base">Rocket</h1>
+            <p className="text-xs text-white/60">Marketing CRM</p>
           </div>
           <button
             onClick={() => setOpen(false)}

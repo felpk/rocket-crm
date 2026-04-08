@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rocket Mídia CRM",
+  title: "Rocket Marketing CRM",
   description: "CRM com automação de funil de vendas e integração WhatsApp",
+  icons: { icon: "/logo_rocketmidia.jpg" },
 };
 
 export default function RootLayout({

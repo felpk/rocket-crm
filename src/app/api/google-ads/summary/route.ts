@@ -1,29 +1,36 @@
 import { requireAuth } from "@/lib/auth";
 import { getValidToken, getAccountSummary } from "@/lib/google-ads";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("google-ads/summary");
 
 export async function GET(req: Request) {
-  const session = await requireAuth();
-  const url = new URL(req.url);
-  const targetUserId = url.searchParams.get("userId");
-
-  const userId =
-    session.role === "admin" && targetUserId ? targetUserId : session.id;
-
-  const token = await getValidToken(userId);
-  if (!token) {
-    return Response.json(
-      { error: "Google Ads não conectado" },
-      { status: 404 }
-    );
-  }
-
+  log.info("GET /api/google-ads/summary");
   try {
+    const session = await requireAuth();
+    const url = new URL(req.url);
+    const targetUserId = url.searchParams.get("userId");
+
+    const userId =
+      session.role === "admin" && targetUserId ? targetUserId : session.id;
+
+    const token = await getValidToken(userId);
+    if (!token) {
+      log.warn("Google Ads não conectado", { userId });
+      return Response.json(
+        { error: "Google Ads não conectado" },
+        { status: 404 }
+      );
+    }
+
     const summary = await getAccountSummary(
       token.customerId,
       token.accessToken
     );
+    log.info("Summary carregado", summary);
     return Response.json(summary);
   } catch (error) {
+    log.error("Falha ao buscar métricas", { error: String(error) });
     return Response.json(
       { error: "Falha ao buscar métricas", details: String(error) },
       { status: 500 }

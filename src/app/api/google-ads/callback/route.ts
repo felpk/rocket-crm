@@ -3,13 +3,19 @@ import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/db";
 import { exchangeCodeForTokens, listAccessibleAccounts } from "@/lib/google-ads";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("google-ads/callback");
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const error = req.nextUrl.searchParams.get("error");
 
+  log.info("GET /api/google-ads/callback", { hasCode: !!code, hasState: !!state, error });
+
   if (error || !code || !state) {
+    log.warn("OAuth negado ou parâmetros ausentes", { error });
     redirect("/settings?error=google-ads-denied");
   }
 
@@ -19,15 +25,21 @@ export async function GET(req: NextRequest) {
       userId: string;
     };
     userId = payload.userId;
+    log.debug("State verificado", { userId });
   } catch {
+    log.error("State JWT inválido ou expirado");
     redirect("/settings?error=google-ads-invalid-state");
   }
 
   try {
+    log.debug("Trocando code por tokens");
     const tokens = await exchangeCodeForTokens(code);
+    log.debug("Tokens obtidos, listando contas");
     const accounts = await listAccessibleAccounts(tokens.access_token);
+    log.info("Contas Google Ads encontradas", { count: accounts.length });
 
     if (accounts.length === 0) {
+      log.warn("Nenhuma conta Google Ads acessível");
       redirect("/settings?error=google-ads-no-accounts");
     }
 
@@ -50,8 +62,10 @@ export async function GET(req: NextRequest) {
         tokenExpiry,
       },
     });
+
+    log.info("Google Ads conectado com sucesso", { userId, customerId });
   } catch (err) {
-    console.error("Google Ads OAuth error:", err);
+    log.error("Erro no OAuth Google Ads", { error: String(err) });
     redirect("/settings?error=google-ads-failed");
   }
 

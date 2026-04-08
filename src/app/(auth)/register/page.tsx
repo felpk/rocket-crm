@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Rocket } from "lucide-react";
+import Image from "next/image";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -38,10 +38,14 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mb-4">
-            <Rocket className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold">Rocket Mídia</h1>
+          <Image
+            src="/logo_rocketmidia.jpg"
+            alt="Rocket Marketing"
+            width={80}
+            height={80}
+            className="rounded-full mb-4"
+          />
+          <h1 className="text-2xl font-bold">Rocket Marketing</h1>
           <p className="text-white/60 text-sm mt-1">
             Crie sua conta
           </p>
