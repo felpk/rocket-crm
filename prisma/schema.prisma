@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          String    @default("client") // "admin" | "client"
+  phone         String?
+  company       String?
+  avatar        String?
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  leads         Lead[]
+  automations   Automation[]
+  whatsappConnection WhatsappConnection?
+  googleAdsConnection GoogleAdsConnection?
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  value       Float    @default(0)
+  origin      String?
+  notes       String?
+  stage       String   @default("lead") // lead, qualification, meeting, proposal, negotiation, closed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messages    Message[]
+}
+
+model Automation {
+  id          String   @id @default(cuid())
+  name        String
+  triggerType String   // entry, followup, stage_change, keyword
+  triggerConfig String // JSON config
+  actionType  String   // send_message, move_stage
+  actionConfig String  // JSON config
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  logs        AutomationLog[]
+}
+
+model AutomationLog {
+  id           String   @id @default(cuid())
+  status       String   // success, error
+  details      String?
+  executedAt   DateTime @default(now())
+
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+}
+
+model WhatsappConnection {
+  id           String   @id @default(cuid())
+  instanceName String
+  status       String   @default("disconnected") // connected, disconnected
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoogleAdsConnection {
+  id            String   @id @default(cuid())
+  customerId    String
+  accessToken   String
+  refreshToken  String
+  tokenExpiry   DateTime
+  accountName   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  fromMe    Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
