@@ -17,7 +17,8 @@ async function main() {
   });
 
   if (!existing) {
-    const hashedPassword = await bcrypt.hash("admin123", 12);
+    const adminPassword = process.env.ADMIN_PASSWORD || "changeme";
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
     await prisma.user.create({
       data: {
         name: "Rocket Mídia",
@@ -28,7 +29,7 @@ async function main() {
         company: "Rocket Mídia",
       },
     });
-    console.log("Admin criado: rocketmidia09@gmail.com / admin123");
+    console.log("Admin criado:", adminEmail);
   } else {
     console.log("Admin já existe");
   }

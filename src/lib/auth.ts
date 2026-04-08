@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "fallback-secret";
+const JWT_SECRET = process.env.NEXTAUTH_SECRET!;
 
 export interface SessionUser {
   id: string;
