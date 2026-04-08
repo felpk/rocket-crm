@@ -1,21 +1,38 @@
 @AGENTS.md
 
-# Rocket Mídia CRM
+# Rocket Marketing CRM
 
 ## Stack
 - **Framework**: Next.js 16 (App Router) — TypeScript
 - **DB**: SQLite via Prisma 7 (better-sqlite3 adapter)
 - **Auth**: JWT custom com cookies httpOnly (`src/lib/auth.ts`)
-- **UI**: Tailwind CSS, tema dark fixo (#0A1628, #1E3A5F, #4A90D9)
+- **UI**: Tailwind CSS, tema dark fixo (#121721 fundo, #1a1f2e cards, #3b6fd4 accent)
 - **WhatsApp**: Evolution API v2 (`src/lib/evolution.ts`)
 - **Google Ads**: OAuth 2.0 + REST API v19 (`src/lib/google-ads.ts`)
+- **Logging**: Logger centralizado (`src/lib/logger.ts`) — todos os eventos logados no terminal
 
 ## Comandos
-- `npm run dev` — dev server (http://localhost:3000)
-- `npm run build` — build de produção (rodar antes de PR)
-- `npx prisma migrate dev --name <nome>` — criar migration
-- `npx prisma generate` — regenerar client após alterar schema
-- `npx prisma studio` — UI visual do banco
+```bash
+npm run dev          # dev server (http://localhost:3000)
+npm run build        # build de produção (rodar antes de PR)
+npm run test:api     # testes E2E (requer dev server rodando)
+npm run db:seed      # criar admin (definir ADMIN_PASSWORD no .env)
+npm run db:migrate   # aplicar migrations do Prisma
+npm run db:studio    # UI visual do banco
+npx prisma generate  # regenerar client após alterar schema
+```
+
+## Setup em novo computador
+```bash
+git clone https://github.com/felpk/rocket-crm.git
+cd rocket-crm
+npm install
+cp .env.example .env           # editar com suas credenciais
+npx prisma generate
+npx prisma migrate dev
+ADMIN_PASSWORD=suaSenha npx tsx prisma/seed.ts
+npm run dev
+```
 
 ## Estrutura
 ```
@@ -32,9 +49,23 @@ src/
     api/google-ads/               — auth, callback, status, disconnect, campaigns, summary
     api/admin/                    — clients, stats
   components/                    — Sidebar, etc.
-  lib/                           — db, auth, evolution, google-ads, utils
+  lib/                           — db, auth, evolution, google-ads, logger, utils
   generated/prisma/              — client Prisma gerado (gitignored)
+scripts/
+  test-api.ts                    — testes E2E de todas as APIs
 ```
+
+## Logging
+Todos os eventos são logados no terminal com formato:
+```
+[2026-04-08T14:51:20.379Z] [INFO] [auth/login] Login bem-sucedido {"userId":"abc","role":"admin"}
+```
+- **INFO**: operações normais (login, criar lead, etc.)
+- **WARN**: falhas esperadas (credenciais inválidas, lead não encontrado)
+- **ERROR**: falhas inesperadas (DB error, API externa falhou)
+- **DEBUG**: detalhes internos (queries, payloads) — só em dev
+
+Para criar logger em novo módulo: `const log = createLogger("nome-modulo");`
 
 ## Regras de Negócio
 - Admin = conta `rocketmidia09@gmail.com` (auto-detectado no cadastro)
@@ -43,9 +74,9 @@ src/
 - Google Ads: cada cliente conecta via OAuth, métricas puxadas da API v19
 
 ## Fases
-- **Fase 1 (MVP)** — Auth, Dashboard, Funil Kanban, Leads, Admin
+- **Fase 1 (MVP)** — Auth, Dashboard, Funil Kanban, Leads, Admin ✅
 - **Fase 2** — Automações, Chat WhatsApp integrado
-- **Fase 3** — Google Ads (conectado), Meta Ads, Relatórios avançados
+- **Fase 3** — Google Ads (integrado, falta OAuth credentials), Meta Ads, Relatórios
 
 ## Git Workflow
 
@@ -67,13 +98,10 @@ src/
 ### Commits
 - Formato: `tipo: descrição curta em pt-BR`
 - Tipos: `feat`, `fix`, `refactor`, `docs`, `style`, `chore`
-- Exemplos:
-  - `feat: adicionar dashboard Google Ads`
-  - `fix: corrigir refresh de token OAuth`
-  - `chore: atualizar dependências`
 
 ## Checklist antes de PR
 - [ ] `npm run build` sem erros
+- [ ] `npm run test:api` passa (com dev server rodando)
 - [ ] Testar fluxo manualmente no browser
 - [ ] Não commitar `.env`, `dev.db` ou `src/generated/`
 - [ ] Mensagem de commit segue o padrão
