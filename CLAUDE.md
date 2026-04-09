@@ -101,6 +101,10 @@ Para criar logger em novo módulo: `const log = createLogger("nome-modulo");`
 
 ## Mandatory Practices for Claude Code
 
+### Keep CLAUDE.md Files Updated
+- Each part of the monorepo has its own `CLAUDE.md` — update them when changing architecture, adding modules, or modifying patterns.
+- Locations: `apps/api/CLAUDE.md`, `apps/mobile/CLAUDE.md`, `packages/shared/CLAUDE.md`, `src/CLAUDE.md`
+
 ### Frequent Git Commits
 - Commit after each meaningful unit of work — never accumulate everything at the end.
 - Small, incremental commits that are easy to understand and revert.
