@@ -40,8 +40,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
 
-# Data directory for SQLite
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+# Data directory for SQLite + Next.js cache
+RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next
 
 # Startup script: migrate then start
 COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
