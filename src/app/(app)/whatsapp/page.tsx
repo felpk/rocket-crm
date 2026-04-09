@@ -15,6 +15,8 @@ export default function WhatsAppPage() {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   async function checkConnection() {
     setLoading(true);
@@ -31,14 +33,25 @@ export default function WhatsAppPage() {
   }
 
   async function loadQrCode() {
+    setQrLoading(true);
+    setQrError(null);
+    setQrData(null);
     try {
       const res = await fetch("/api/whatsapp/qrcode");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.base64) setQrData(data.base64);
+      const data = await res.json();
+      if (!res.ok) {
+        setQrError(data.error || "Erro ao gerar QR Code");
+        return;
+      }
+      if (data.base64) {
+        setQrData(data.base64);
+      } else {
+        setQrError("QR Code não retornado pela API");
       }
     } catch {
-      // ignore
+      setQrError("Erro de conexão ao gerar QR Code");
+    } finally {
+      setQrLoading(false);
     }
   }
 
@@ -120,10 +133,16 @@ export default function WhatsAppPage() {
           <div className="mt-4 pt-4 border-t border-white/10">
             <button
               onClick={loadQrCode}
-              className="bg-accent hover:bg-accent/80 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              disabled={qrLoading}
+              className="bg-accent hover:bg-accent/80 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
-              Gerar QR Code
+              {qrLoading ? "Gerando..." : "Gerar QR Code"}
             </button>
+            {qrError && (
+              <div className="mt-4 px-4 py-3 rounded-lg text-sm bg-error/20 text-error">
+                {qrError}
+              </div>
+            )}
             {qrData && (
               <div className="mt-4 flex justify-center">
                 <img
