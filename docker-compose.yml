@@ -1,0 +1,68 @@
+version: "3.7"
+
+services:
+  rocket-crm:
+    image: rocket-crm:latest
+    build: .
+    networks:
+      - rede_geral
+    volumes:
+      - rocket-data:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/rocket.db
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=https://rocket.avancesbr.com
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-}
+      - GOOGLE_ADS_DEVELOPER_TOKEN=${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      - GOOGLE_ADS_CLIENT_ID=${GOOGLE_ADS_CLIENT_ID:-}
+      - GOOGLE_ADS_CLIENT_SECRET=${GOOGLE_ADS_CLIENT_SECRET:-}
+      - GOOGLE_ADS_REDIRECT_URI=https://rocket.avancesbr.com/api/google-ads/callback
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.rocket-crm.rule=Host(`rocket.avancesbr.com`)
+        - traefik.http.routers.rocket-crm.entrypoints=websecure
+        - traefik.http.routers.rocket-crm.tls.certresolver=letsencryptresolver
+        - traefik.http.services.rocket-crm.loadbalancer.server.port=3000
+
+  rocket-crm-dev:
+    image: rocket-crm-dev:latest
+    build: .
+    networks:
+      - rede_geral
+    volumes:
+      - rocket-data-dev:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/rocket-dev.db
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET_DEV:-dev-secret}
+      - NEXTAUTH_URL=https://dev.rocket.avancesbr.com
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-}
+      - GOOGLE_ADS_DEVELOPER_TOKEN=${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      - GOOGLE_ADS_CLIENT_ID=${GOOGLE_ADS_CLIENT_ID:-}
+      - GOOGLE_ADS_CLIENT_SECRET=${GOOGLE_ADS_CLIENT_SECRET:-}
+      - GOOGLE_ADS_REDIRECT_URI=https://dev.rocket.avancesbr.com/api/google-ads/callback
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.rocket-crm-dev.rule=Host(`dev.rocket.avancesbr.com`)
+        - traefik.http.routers.rocket-crm-dev.entrypoints=websecure
+        - traefik.http.routers.rocket-crm-dev.tls.certresolver=letsencryptresolver
+        - traefik.http.services.rocket-crm-dev.loadbalancer.server.port=3000
+
+volumes:
+  rocket-data:
+  rocket-data-dev:
+
+networks:
+  rede_geral:
+    external: true

@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+*.md
+.env
+.env.local
+dev.db
+dev.db-journal
+src/generated/

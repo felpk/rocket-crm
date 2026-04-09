@@ -45,15 +45,15 @@ export default function RegisterPage() {
             height={80}
             className="rounded-full mb-4"
           />
-          <h1 className="text-2xl font-bold">Rocket Marketing</h1>
-          <p className="text-white/60 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Rocket Marketing</h1>
+          <p className="text-muted-fg text-sm mt-1">
             Crie sua conta
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-card rounded-xl p-8 space-y-5"
+          className="bg-card border border-border/50 rounded-xl p-8 space-y-5"
         >
           {error && (
             <div className="bg-error/20 border border-error/30 text-error text-sm px-4 py-3 rounded-lg">
@@ -62,40 +62,38 @@ export default function RegisterPage() {
           )}
 
           <div>
-            <label className="block text-sm text-white/70 mb-2">
-              Nome completo
-            </label>
+            <label className="block text-sm text-muted-fg mb-2">Nome completo</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-accent"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-fg/50 focus:outline-none focus:border-accent"
               placeholder="Seu nome"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-white/70 mb-2">Email</label>
+            <label className="block text-sm text-muted-fg mb-2">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-accent"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-fg/50 focus:outline-none focus:border-accent"
               placeholder="seu@email.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-white/70 mb-2">Senha</label>
+            <label className="block text-sm text-muted-fg mb-2">Senha</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-accent"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-fg/50 focus:outline-none focus:border-accent"
               placeholder="Mínimo 6 caracteres"
             />
           </div>
@@ -108,7 +106,7 @@ export default function RegisterPage() {
             {loading ? "Cadastrando..." : "Cadastrar"}
           </button>
 
-          <p className="text-center text-sm text-white/50">
+          <p className="text-center text-sm text-muted-fg">
             Já tem conta?{" "}
             <Link href="/login" className="text-accent hover:underline">
               Fazer login

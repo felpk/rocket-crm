@@ -10,7 +10,8 @@
     "test:api": "npx tsx scripts/test-api.ts",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:migrate": "npx prisma migrate dev",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "setup": "npx prisma generate && npx prisma migrate dev && npx tsx prisma/seed.ts && npm run dev"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
