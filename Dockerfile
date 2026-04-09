@@ -32,15 +32,23 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma generated client
+# Copy Prisma files
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
+
+# Copy full node_modules over standalone's (superset — includes prisma CLI deps)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Data directory for SQLite + Next.js cache
 RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next
+
+# Startup script: migrate then start
+RUN printf '#!/bin/sh\nnode node_modules/prisma/build/index.js migrate deploy || echo "Migration skipped"\nnode server.js\n' > /app/start.sh && chmod +x /app/start.sh
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["/app/start.sh"]

@@ -22,7 +22,7 @@ npm run db:studio    # UI visual do banco
 npx prisma generate  # regenerar client após alterar schema
 ```
 
-## Setup em novo computador
+## Setup local (dev)
 ```bash
 git clone https://github.com/felpk/rocket-crm.git
 cd rocket-crm
@@ -32,6 +32,46 @@ npx prisma generate
 npx prisma migrate dev
 ADMIN_PASSWORD=suaSenha npx tsx prisma/seed.ts
 npm run dev
+```
+
+## Deploy Docker (produção/dev)
+```bash
+# Build e deploy via Docker Swarm
+docker build -t rocket-crm-dev:latest .
+docker service update --image rocket-crm-dev:latest --force rocket_rocket-crm-dev
+
+# O container executa automaticamente:
+# 1. prisma migrate deploy (aplica migrations pendentes)
+# 2. node server.js (inicia Next.js standalone)
+
+# Para criar admin no container:
+docker exec <container_id> sh -c "ADMIN_PASSWORD=suaSenha node -e \"require('./prisma/seed.ts')\""
+# Ou registrar via /register com email rocketmidia09@gmail.com (auto-admin)
+```
+
+### Ambientes
+| Ambiente | URL | DATABASE_URL | Stack |
+|----------|-----|-------------|-------|
+| Prod | `rocket.avancesbr.com` | `file:/app/data/rocket.db` | Docker Swarm + Traefik |
+| Dev | `dev.rocket.avancesbr.com` | `file:/app/data/rocket-dev.db` | Docker Swarm + Traefik |
+
+### Dockerfile
+- Multi-stage: `deps` → `builder` → `runner`
+- Runtime inclui `node_modules` completo (necessário para `prisma migrate deploy`)
+- SQLite persiste no volume Docker (`rocket-data` / `rocket-data-dev`)
+- App roda como user `nextjs` (uid 1001) — arquivos no volume devem ter essa permissão
+
+### Variáveis de ambiente (.env)
+```
+DATABASE_URL=file:./dev.db           # obrigatório para dev local
+NEXTAUTH_SECRET=...                  # JWT signing secret
+ADMIN_PASSWORD=...                   # senha do admin no seed
+GOOGLE_ADS_DEVELOPER_TOKEN=...       # Google Ads API
+GOOGLE_ADS_CLIENT_ID=...
+GOOGLE_ADS_CLIENT_SECRET=...
+EVOLUTION_API_URL=...                # WhatsApp Evolution API
+EVOLUTION_API_KEY=...
+EVOLUTION_INSTANCE_NAME=...
 ```
 
 ## Estrutura
