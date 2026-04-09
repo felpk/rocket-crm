@@ -8,7 +8,7 @@ const log = createLogger("whatsapp/send");
 export async function POST(req: Request) {
   log.info("POST /api/whatsapp/send");
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { phone, text, leadId } = await req.json();
 
     if (!phone || !text) {
@@ -19,8 +19,20 @@ export async function POST(req: Request) {
       );
     }
 
-    log.debug("Enviando mensagem", { phone, leadId, textLength: text.length });
-    const result = await sendTextMessage(phone, text);
+    const connection = await prisma.whatsappConnection.findUnique({
+      where: { userId: session.id },
+    });
+
+    if (!connection || connection.status !== "connected") {
+      log.warn("WhatsApp não conectado", { userId: session.id, status: connection?.status });
+      return Response.json(
+        { error: "WhatsApp não está conectado. Conecte primeiro na página do WhatsApp." },
+        { status: 400 }
+      );
+    }
+
+    log.debug("Enviando mensagem", { instanceName: connection.instanceName, phone, leadId, textLength: text.length });
+    const result = await sendTextMessage(connection.instanceName, phone, text);
 
     if (leadId) {
       await prisma.message.create({

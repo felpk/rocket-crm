@@ -139,6 +139,25 @@ Para criar logger em novo módulo: `const log = createLogger("nome-modulo");`
 - Formato: `tipo: descrição curta em pt-BR`
 - Tipos: `feat`, `fix`, `refactor`, `docs`, `style`, `chore`
 
+## Mandatory Practices for Claude Code
+
+### Keep CLAUDE.md Files Updated
+- Each part of the monorepo has its own `CLAUDE.md` — update them when changing architecture, adding modules, or modifying patterns.
+- Locations: `apps/api/CLAUDE.md`, `apps/mobile/CLAUDE.md`, `packages/shared/CLAUDE.md`, `src/CLAUDE.md`
+
+### Frequent Git Commits
+- Commit after each meaningful unit of work — never accumulate everything at the end.
+- Small, incremental commits that are easy to understand and revert.
+- Descriptive commit messages in pt-BR following the convention (`type: description`).
+- Keep documentation (CLAUDE.md) up-to-date when there are changes to architecture, features, or structure.
+
+### Tests with Error Tracing
+- Always write tests that cover error scenarios — not just the happy path.
+- Test: invalid input, auth failures, resource not found, DB errors, external API failures.
+- Error messages and assertions must include enough context (module, function, expected vs actual values) to trace the exact origin in the code.
+- Use the project's logger (`createLogger`) to ensure errors are logged with module context.
+- Tests are written alongside the feature — never deferred to later.
+
 ## Checklist antes de PR
 - [ ] `npm run build` sem erros
 - [ ] `npm run test:api` passa (com dev server rodando)
