@@ -44,7 +44,7 @@ COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
 RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next
 
 # Startup script: migrate then start
-RUN printf '#!/bin/sh\nnpx prisma migrate deploy || echo "Migration skipped"\nnode server.js\n' > /app/start.sh && chmod +x /app/start.sh
+RUN printf '#!/bin/sh\nnode node_modules/prisma/build/index.js migrate deploy || echo "Migration skipped"\nnode server.js\n' > /app/start.sh && chmod +x /app/start.sh
 
 USER nextjs
 EXPOSE 3000
