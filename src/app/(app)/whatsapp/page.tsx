@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MessageSquare, Wifi, WifiOff, Send } from "lucide-react";
 
 interface ConnectionState {
@@ -17,6 +17,7 @@ export default function WhatsAppPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function checkConnection() {
     setLoading(true);
@@ -25,11 +26,43 @@ export default function WhatsAppPage() {
       if (res.ok) {
         const data = await res.json();
         setConnection(data);
+        // Se conectou, limpar QR e parar polling
+        if (data?.instance?.state === "open") {
+          setQrData(null);
+          stopPolling();
+        }
       }
     } catch {
       setConnection(null);
     }
     setLoading(false);
+  }
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/whatsapp/status");
+        if (res.ok) {
+          const data = await res.json();
+          setConnection(data);
+          if (data?.instance?.state === "open") {
+            setQrData(null);
+            setQrError(null);
+            stopPolling();
+          }
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 5000);
   }
 
   async function loadQrCode() {
@@ -45,6 +78,7 @@ export default function WhatsAppPage() {
       }
       if (data.base64) {
         setQrData(data.base64);
+        startPolling();
       } else {
         setQrError("QR Code não retornado pela API");
       }
@@ -57,6 +91,7 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     checkConnection();
+    return () => stopPolling();
   }, []);
 
   const isConnected = connection?.instance?.state === "open";
@@ -136,7 +171,7 @@ export default function WhatsAppPage() {
               disabled={qrLoading}
               className="bg-accent hover:bg-accent/80 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
-              {qrLoading ? "Gerando..." : "Gerar QR Code"}
+              {qrLoading ? "Conectando..." : "Conectar WhatsApp"}
             </button>
             {qrError && (
               <div className="mt-4 px-4 py-3 rounded-lg text-sm bg-error/20 text-error">
@@ -144,12 +179,20 @@ export default function WhatsAppPage() {
               </div>
             )}
             {qrData && (
-              <div className="mt-4 flex justify-center">
-                <img
-                  src={qrData}
-                  alt="QR Code WhatsApp"
-                  className="w-64 h-64 rounded-lg bg-white p-2"
-                />
+              <div className="mt-4">
+                <p className="text-sm text-white/60 mb-3">
+                  Escaneie o QR Code com seu WhatsApp para conectar.
+                </p>
+                <div className="flex justify-center">
+                  <img
+                    src={qrData}
+                    alt="QR Code WhatsApp"
+                    className="w-64 h-64 rounded-lg bg-white p-2"
+                  />
+                </div>
+                <p className="text-xs text-white/40 mt-2 text-center">
+                  Aguardando conexão...
+                </p>
               </div>
             )}
           </div>

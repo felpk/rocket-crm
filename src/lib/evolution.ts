@@ -4,7 +4,6 @@ const log = createLogger("evolution-api");
 
 const API_URL = process.env.EVOLUTION_API_URL!;
 const API_KEY = process.env.EVOLUTION_API_KEY!;
-const INSTANCE = process.env.EVOLUTION_INSTANCE_NAME!;
 
 async function evoFetch(path: string, options?: RequestInit) {
   const url = `${API_URL}${path}`;
@@ -26,27 +25,48 @@ async function evoFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
-export async function getConnectionState() {
-  log.info("Verificando estado da conexão", { instance: INSTANCE });
-  return evoFetch(`/instance/connectionState/${INSTANCE}`);
+export function makeInstanceName(userId: string): string {
+  return `rocket-${userId}`;
 }
 
-export async function getQrCode() {
-  log.info("Gerando QR Code", { instance: INSTANCE });
-  return evoFetch(`/instance/connect/${INSTANCE}`);
+export async function createInstance(instanceName: string) {
+  log.info("Criando instância", { instance: instanceName });
+  return evoFetch("/instance/create", {
+    method: "POST",
+    body: JSON.stringify({
+      instanceName,
+      integration: "WHATSAPP-BAILEYS",
+      qrcode: true,
+    }),
+  });
 }
 
-export async function sendTextMessage(phone: string, text: string) {
-  log.info("Enviando mensagem", { instance: INSTANCE, phone, textLength: text.length });
-  return evoFetch(`/message/sendText/${INSTANCE}`, {
+export async function deleteInstance(instanceName: string) {
+  log.info("Deletando instância", { instance: instanceName });
+  return evoFetch(`/instance/delete/${instanceName}`, { method: "DELETE" });
+}
+
+export async function getConnectionState(instanceName: string) {
+  log.info("Verificando estado da conexão", { instance: instanceName });
+  return evoFetch(`/instance/connectionState/${instanceName}`);
+}
+
+export async function getQrCode(instanceName: string) {
+  log.info("Gerando QR Code", { instance: instanceName });
+  return evoFetch(`/instance/connect/${instanceName}`);
+}
+
+export async function sendTextMessage(instanceName: string, phone: string, text: string) {
+  log.info("Enviando mensagem", { instance: instanceName, phone, textLength: text.length });
+  return evoFetch(`/message/sendText/${instanceName}`, {
     method: "POST",
     body: JSON.stringify({ number: phone, text }),
   });
 }
 
-export async function fetchMessages(phone: string) {
-  log.info("Buscando mensagens", { instance: INSTANCE, phone });
-  return evoFetch(`/chat/findMessages/${INSTANCE}`, {
+export async function fetchMessages(instanceName: string, phone: string) {
+  log.info("Buscando mensagens", { instance: instanceName, phone });
+  return evoFetch(`/chat/findMessages/${instanceName}`, {
     method: "POST",
     body: JSON.stringify({
       where: {
@@ -56,5 +76,3 @@ export async function fetchMessages(phone: string) {
     }),
   });
 }
-
-export { INSTANCE };
