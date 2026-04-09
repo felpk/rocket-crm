@@ -27,21 +27,29 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Install prisma CLI for runtime migrations
+RUN npm install -g prisma@7.7.0
+
 # Copy standalone build
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema + generated client
+# Copy Prisma schema, config, and generated client
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
 
 # Data directory for SQLite
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
+# Startup script: migrate then start
+COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
+RUN printf '#!/bin/sh\nprisma migrate deploy\nnode server.js\n' > /app/start.sh && chmod +x /app/start.sh
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["/app/start.sh"]
