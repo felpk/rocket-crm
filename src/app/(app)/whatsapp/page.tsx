@@ -18,6 +18,7 @@ export default function WhatsAppPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function checkConnection() {
     setLoading(true);
@@ -43,6 +44,22 @@ export default function WhatsAppPage() {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    if (qrRefreshRef.current) {
+      clearInterval(qrRefreshRef.current);
+      qrRefreshRef.current = null;
+    }
+  }
+
+  async function refreshQrCode() {
+    try {
+      const res = await fetch("/api/whatsapp/qrcode");
+      const data = await res.json();
+      if (res.ok && data.base64) {
+        setQrData(data.base64);
+      }
+    } catch {
+      // ignore refresh errors
+    }
   }
 
   function startPolling() {
@@ -63,6 +80,8 @@ export default function WhatsAppPage() {
         // ignore polling errors
       }
     }, 5000);
+    // Auto-refresh QR code every 30s before it expires
+    qrRefreshRef.current = setInterval(refreshQrCode, 30000);
   }
 
   async function loadQrCode() {
