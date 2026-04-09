@@ -31,8 +31,8 @@ export async function GET() {
           },
         });
 
-        // createInstance com qrcode:true pode retornar o QR direto
-        const base64 = created.base64 || created.qrcode;
+        // createInstance retorna qrcode como objeto { base64, code, count }
+        const base64 = created.base64 || created.qrcode?.base64;
         if (base64) {
           log.info("QR Code retornado na criação da instância");
           return Response.json({ base64 });
@@ -62,7 +62,7 @@ export async function GET() {
     const qr = await getQrCode(instanceName);
     log.debug("Resposta getQrCode", { keys: Object.keys(qr), hasBase64: !!qr.base64 });
 
-    const base64 = qr.base64 || qr.qrcode;
+    const base64 = qr.base64 || qr.qrcode?.base64;
     if (!base64) {
       log.warn("QR Code não encontrado na resposta", { response: JSON.stringify(qr).slice(0, 500) });
       return Response.json(
