@@ -8,7 +8,7 @@
 - **Auth**: JWT custom com cookies httpOnly (`src/lib/auth.ts`)
 - **UI**: Tailwind CSS, tema dark fixo (#121721 fundo, #1a1f2e cards, #3b6fd4 accent)
 - **WhatsApp**: Evolution API v2 (`src/lib/evolution.ts`)
-- **Google Ads**: OAuth 2.0 + REST API v19 (`src/lib/google-ads.ts`)
+- **Google Ads**: OAuth 2.0 + REST API v20 (`src/lib/google-ads.ts`)
 - **Logging**: Logger centralizado (`src/lib/logger.ts`) — todos os eventos logados no terminal
 
 ## Comandos
@@ -36,23 +36,24 @@ npm run dev
 
 ## Estrutura
 ```
-src/
-  app/
-    (auth)/login, register        — páginas públicas
-    (app)/dashboard, funnel,      — páginas autenticadas
+src/                             — Aplicação principal (src/CLAUDE.md)
+  app/                           — Next.js App Router (src/app/CLAUDE.md)
+    (auth)/login, register       — páginas públicas
+    (app)/dashboard, funnel,     — páginas autenticadas
           whatsapp, google-ads,
           automations, admin,
           settings
-    api/auth/                     — login, register, logout, me
-    api/leads/, api/leads/[id]/   — CRUD de leads
-    api/whatsapp/                 — status, send, qrcode
-    api/google-ads/               — auth, callback, status, disconnect, campaigns, summary
-    api/admin/                    — clients, stats
-  components/                    — Sidebar, etc.
-  lib/                           — db, auth, evolution, google-ads, logger, utils
-  generated/prisma/              — client Prisma gerado (gitignored)
-scripts/
-  test-api.ts                    — testes E2E de todas as APIs
+    api/                         — REST API routes (src/app/api/CLAUDE.md)
+  components/                    — Componentes compartilhados (src/components/CLAUDE.md)
+  lib/                           — Bibliotecas core (src/lib/CLAUDE.md)
+    automations/                 — Engine de automações (src/lib/automations/CLAUDE.md)
+  generated/prisma/              — Client Prisma gerado (gitignored)
+prisma/                          — Schema e migrations (prisma/CLAUDE.md)
+scripts/                         — Scripts utilitários (scripts/CLAUDE.md)
+.github/                         — CI/CD workflows (.github/CLAUDE.md)
+apps/api/                        — API Fastify (futuro, apps/api/CLAUDE.md)
+apps/mobile/                     — App mobile React Native (futuro, apps/mobile/CLAUDE.md)
+packages/shared/                 — Tipos compartilhados (packages/shared/CLAUDE.md)
 ```
 
 ## Logging
@@ -71,7 +72,7 @@ Para criar logger em novo módulo: `const log = createLogger("nome-modulo");`
 - Admin = conta `rocketmidia09@gmail.com` (auto-detectado no cadastro)
 - Multi-tenant: cliente vê só seus dados, admin vê tudo
 - Funil: 6 etapas fixas (Lead → Qualificação → Reunião → Proposta → Negociação → Fechado)
-- Google Ads: cada cliente conecta via OAuth, métricas puxadas da API v19
+- Google Ads: cada cliente conecta via OAuth, métricas puxadas da API v20
 
 ## Fases
 - **Fase 1 (MVP)** — Auth, Dashboard, Funil Kanban, Leads, Admin ✅
@@ -102,8 +103,18 @@ Para criar logger em novo módulo: `const log = createLogger("nome-modulo");`
 ## Mandatory Practices for Claude Code
 
 ### Keep CLAUDE.md Files Updated
-- Each part of the monorepo has its own `CLAUDE.md` — update them when changing architecture, adding modules, or modifying patterns.
-- Locations: `apps/api/CLAUDE.md`, `apps/mobile/CLAUDE.md`, `packages/shared/CLAUDE.md`, `src/CLAUDE.md`
+- Each part of the project has its own `CLAUDE.md` — update them when changing architecture, adding modules, or modifying patterns.
+- Locations:
+  - `src/CLAUDE.md` — Web app overview
+  - `src/app/CLAUDE.md` — Pages and frontend patterns
+  - `src/app/api/CLAUDE.md` — API routes and endpoint reference
+  - `src/components/CLAUDE.md` — Shared UI components and design tokens
+  - `src/lib/CLAUDE.md` — Core libraries (auth, db, integrations)
+  - `src/lib/automations/CLAUDE.md` — Automation engine architecture
+  - `prisma/CLAUDE.md` — Database schema and migrations
+  - `scripts/CLAUDE.md` — Test scripts
+  - `.github/CLAUDE.md` — CI/CD and Docker deployment
+  - `apps/api/CLAUDE.md`, `apps/mobile/CLAUDE.md`, `packages/shared/CLAUDE.md` — Future monorepo modules
 
 ### Frequent Git Commits
 - Commit after each meaningful unit of work — never accumulate everything at the end.

@@ -7,6 +7,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# --- Prisma deps (isolated install for migrations in runtime) ---
+FROM base AS prisma-deps
+WORKDIR /prisma-install
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts && rm -rf package.json package-lock.json
+
 # --- Build ---
 FROM base AS builder
 WORKDIR /app
@@ -33,20 +39,31 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema, config, generated client, and prisma package for migrations
+# Copy Prisma schema, config, and generated client
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/dotenv ./node_modules/dotenv
-COPY --from=builder /app/node_modules/effect ./node_modules/effect
-COPY --from=builder /app/node_modules/@standard-schema ./node_modules/@standard-schema
-COPY --from=builder /app/node_modules/fast-check ./node_modules/fast-check
-COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
-# Data directory for SQLite + Next.js cache
-RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next
+# Copy full node_modules from prisma-deps for migration CLI (includes all transitive deps)
+COPY --from=prisma-deps /prisma-install/node_modules ./node_modules_prisma
+# Merge prisma deps into node_modules without overwriting standalone deps (e.g. better-sqlite3)
+RUN for pkg in /app/node_modules_prisma/*; do \
+      name=$(basename "$pkg"); \
+      [ -e "/app/node_modules/$name" ] || cp -r "$pkg" "/app/node_modules/$name"; \
+    done && \
+    for scope_dir in /app/node_modules_prisma/@*; do \
+      scope=$(basename "$scope_dir"); \
+      mkdir -p "/app/node_modules/$scope"; \
+      for pkg in "$scope_dir"/*; do \
+        name=$(basename "$pkg"); \
+        [ -e "/app/node_modules/$scope/$name" ] || cp -r "$pkg" "/app/node_modules/$scope/$name"; \
+      done; \
+    done && \
+    rm -rf /app/node_modules_prisma
+
+# Data directory for SQLite + Next.js cache + Prisma engines write access
+RUN mkdir -p /app/data /app/.next/cache && \
+    chown -R nextjs:nodejs /app/data /app/.next /app/node_modules/@prisma/engines
 
 # Startup script: migrate then start
 RUN printf '#!/bin/sh\nnode node_modules/prisma/build/index.js migrate deploy || echo "Migration skipped"\nnode server.js\n' > /app/start.sh && chmod +x /app/start.sh
