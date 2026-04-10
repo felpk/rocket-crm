@@ -1,4 +1,7 @@
 import { prisma } from "./db";
+import { createLogger } from "./logger";
+
+const log = createLogger("google-ads");
 
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN!;
 const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID!;
@@ -6,6 +9,21 @@ const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET!;
 const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI!;
 const API_BASE = "https://googleads.googleapis.com/v19";
 const OAUTH_BASE = "https://oauth2.googleapis.com";
+
+function parseErrorResponse(status: number, text: string): string {
+  // Try JSON first
+  try {
+    const json = JSON.parse(text);
+    const msg = json.error?.message || json.error_description || json.error || text;
+    return `${status} - ${msg}`;
+  } catch {
+    // Strip HTML tags if response is HTML
+    if (text.includes("<html") || text.includes("<!DOCTYPE")) {
+      return `${status} - Endpoint retornou HTML (URL possivelmente incorreta)`;
+    }
+    return `${status} - ${text.slice(0, 300)}`;
+  }
+}
 
 // --- OAuth ---
 
@@ -23,6 +41,7 @@ export function getAuthUrl(state: string): string {
 }
 
 export async function exchangeCodeForTokens(code: string) {
+  log.info("Trocando code por tokens");
   const res = await fetch(`${OAUTH_BASE}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -36,7 +55,9 @@ export async function exchangeCodeForTokens(code: string) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`OAuth token exchange failed: ${text}`);
+    const error = parseErrorResponse(res.status, text);
+    log.error("Falha ao trocar code por tokens", { error });
+    throw new Error(`Falha no token exchange: ${error}`);
   }
   return res.json() as Promise<{
     access_token: string;
@@ -46,6 +67,7 @@ export async function exchangeCodeForTokens(code: string) {
 }
 
 export async function refreshAccessToken(refreshToken: string) {
+  log.info("Renovando access token");
   const res = await fetch(`${OAUTH_BASE}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -58,7 +80,9 @@ export async function refreshAccessToken(refreshToken: string) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Token refresh failed: ${text}`);
+    const error = parseErrorResponse(res.status, text);
+    log.error("Falha ao renovar token", { error });
+    throw new Error(`Falha ao renovar token: ${error}`);
   }
   return res.json() as Promise<{
     access_token: string;
@@ -76,6 +100,7 @@ async function gadsFetch(
 ) {
   const cleanId = customerId.replace(/-/g, "");
   const url = `${API_BASE}/customers/${cleanId}${path}`;
+  log.debug("gadsFetch", { path, customerId: cleanId });
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -87,7 +112,9 @@ async function gadsFetch(
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Google Ads API error: ${res.status} - ${text}`);
+    const error = parseErrorResponse(res.status, text);
+    log.error("Google Ads API erro", { path, error });
+    throw new Error(`Google Ads API: ${error}`);
   }
   return res.json();
 }
@@ -131,6 +158,7 @@ export async function getValidToken(userId: string) {
 // --- Data functions ---
 
 export async function listAccessibleAccounts(accessToken: string) {
+  log.info("Listando contas acessíveis");
   const res = await fetch(
     `${API_BASE}/customers:listAccessibleCustomers`,
     {
@@ -142,7 +170,9 @@ export async function listAccessibleAccounts(accessToken: string) {
   );
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`List accounts failed: ${text}`);
+    const error = parseErrorResponse(res.status, text);
+    log.error("Falha ao listar contas", { error });
+    throw new Error(`Falha ao listar contas Google Ads: ${error}`);
   }
   const data = await res.json();
   const ids: string[] = (data.resourceNames || []).map((r: string) =>

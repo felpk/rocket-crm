@@ -77,7 +77,7 @@ export default function SettingsPage() {
             </span>
           </div>
           {errorDetail && (
-            <pre className="mt-2 text-xs text-white/50 whitespace-pre-wrap break-all bg-black/20 rounded p-2">
+            <pre className="mt-2 text-xs text-white/50 whitespace-pre-wrap break-all bg-black/20 rounded p-2 select-text cursor-text">
               {errorDetail}
             </pre>
           )}
