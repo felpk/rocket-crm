@@ -212,23 +212,531 @@ async function testLeads() {
 async function testWhatsApp() {
   console.log("\n💬 WHATSAPP");
 
+  // 1. Status check
   await test("GET /api/whatsapp/status — verificar conexão", async () => {
     const res = await apiFetch("/api/whatsapp/status");
     if (res.status === 200) {
       const data = await res.json();
-      pass("WhatsApp status", `state=${data.instance?.state}`);
+      if (!data.instance || typeof data.instance.state !== "string") {
+        fail("WhatsApp status", `[FAIL] whatsapp-status | module: whatsapp/status/route.ts | expected: instance.state string | got: ${JSON.stringify(data)}`);
+        return;
+      }
+      pass("WhatsApp status", `state=${data.instance.state}`);
     } else {
-      fail("WhatsApp status", `status=${res.status}`);
+      fail("WhatsApp status", `[FAIL] whatsapp-status | module: whatsapp/status/route.ts | expected: 200 | got: ${res.status}`);
     }
   });
 
+  // 2. Send validation — empty body
   await test("POST /api/whatsapp/send — campos vazios retorna 400", async () => {
     const res = await apiFetch("/api/whatsapp/send", {
       method: "POST",
       body: JSON.stringify({}),
     });
-    if (res.status === 400) pass("WhatsApp send: campos vazios → 400");
-    else fail("WhatsApp send: campos vazios → 400", `status=${res.status}`);
+    if (res.status === 400) {
+      const data = await res.json();
+      if (!data.error) {
+        fail("WhatsApp send: campos vazios → 400", `[FAIL] send-empty | module: whatsapp/send/route.ts | expected: error message | got: ${JSON.stringify(data)}`);
+        return;
+      }
+      pass("WhatsApp send: campos vazios → 400", `error="${data.error}"`);
+    } else {
+      fail("WhatsApp send: campos vazios → 400", `[FAIL] send-empty | module: whatsapp/send/route.ts | expected: 400 | got: ${res.status}`);
+    }
+  });
+
+  // 3. Send validation — phone without text
+  await test("POST /api/whatsapp/send — phone sem text retorna 400", async () => {
+    const res = await apiFetch("/api/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify({ phone: "5511999999999" }),
+    });
+    if (res.status === 400) pass("WhatsApp send: phone sem text → 400");
+    else fail("WhatsApp send: phone sem text → 400", `[FAIL] send-no-text | module: whatsapp/send/route.ts | expected: 400 | got: ${res.status}`);
+  });
+
+  // 4. Send validation — text without phone
+  await test("POST /api/whatsapp/send — text sem phone retorna 400", async () => {
+    const res = await apiFetch("/api/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify({ text: "Hello" }),
+    });
+    if (res.status === 400) pass("WhatsApp send: text sem phone → 400");
+    else fail("WhatsApp send: text sem phone → 400", `[FAIL] send-no-phone | module: whatsapp/send/route.ts | expected: 400 | got: ${res.status}`);
+  });
+
+  // 5. Send when not connected — returns 400 with descriptive error
+  await test("POST /api/whatsapp/send — sem conexão retorna 400", async () => {
+    const res = await apiFetch("/api/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify({ phone: "5511999999999", text: "Teste" }),
+    });
+    // Should be 400 (not connected) or 500 (evolution API unreachable)
+    if (res.status === 400) {
+      const data = await res.json();
+      pass("WhatsApp send: sem conexão → 400", `error="${data.error}"`);
+    } else if (res.status === 500) {
+      pass("WhatsApp send: sem conexão → 500 (evolution API)", "");
+    } else {
+      fail("WhatsApp send: sem conexão", `[FAIL] send-disconnected | module: whatsapp/send/route.ts | expected: 400 or 500 | got: ${res.status}`);
+    }
+  });
+
+  // 6. Conversations endpoint — returns array
+  await test("GET /api/whatsapp/conversations — retorna array", async () => {
+    const res = await apiFetch("/api/whatsapp/conversations");
+    if (res.status === 200) {
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        fail("Conversations: retorna array", `[FAIL] conversations-array | module: whatsapp/conversations/route.ts | expected: array | got: ${typeof data}`);
+        return;
+      }
+      pass("Conversations: retorna array", `count=${data.length}`);
+    } else {
+      fail("Conversations: retorna array", `[FAIL] conversations-array | module: whatsapp/conversations/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 7. Conversations shape validation
+  await test("GET /api/whatsapp/conversations — shape correto", async () => {
+    const res = await apiFetch("/api/whatsapp/conversations");
+    if (res.status !== 200) {
+      fail("Conversations: shape", `[FAIL] conversations-shape | module: whatsapp/conversations/route.ts | expected: 200 | got: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+    if (data.length > 0) {
+      const conv = data[0];
+      const hasFields = "leadId" in conv && "name" in conv && "phone" in conv && "stage" in conv && "lastMessage" in conv && "messageCount" in conv;
+      if (hasFields) {
+        pass("Conversations: shape correto", `fields=leadId,name,phone,stage,lastMessage,messageCount`);
+      } else {
+        fail("Conversations: shape correto", `[FAIL] conversations-shape | module: whatsapp/conversations/route.ts | expected: leadId,name,phone,stage,lastMessage,messageCount | got: ${Object.keys(conv).join(",")}`);
+      }
+    } else {
+      pass("Conversations: shape correto", "array vazio — shape não verificável");
+    }
+  });
+
+  // 8. Messages endpoint — leadId obrigatório
+  await test("GET /api/whatsapp/messages — sem leadId retorna 400", async () => {
+    const res = await apiFetch("/api/whatsapp/messages");
+    if (res.status === 400) {
+      const data = await res.json();
+      pass("Messages: sem leadId → 400", `error="${data.error}"`);
+    } else {
+      fail("Messages: sem leadId → 400", `[FAIL] messages-no-leadId | module: whatsapp/messages/route.ts | expected: 400 | got: ${res.status}`);
+    }
+  });
+
+  // 9. Messages endpoint — lead inexistente retorna 404
+  await test("GET /api/whatsapp/messages — lead inexistente retorna 404", async () => {
+    const res = await apiFetch("/api/whatsapp/messages?leadId=lead_inexistente_xyz");
+    if (res.status === 404) {
+      const data = await res.json();
+      pass("Messages: lead inexistente → 404", `error="${data.error}"`);
+    } else {
+      fail("Messages: lead inexistente → 404", `[FAIL] messages-not-found | module: whatsapp/messages/route.ts | expected: 404 | got: ${res.status}`);
+    }
+  });
+
+  // 10. Messages endpoint — lead válido retorna mensagens
+  await test("GET /api/whatsapp/messages — lead válido", async () => {
+    // Primeiro criar um lead com mensagem para testar
+    const leadRes = await apiFetch("/api/leads", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Lead WhatsApp Teste",
+        phone: "5511888887777",
+        origin: "whatsapp",
+      }),
+    });
+    if (leadRes.status !== 201) {
+      fail("Messages: lead válido", `[FAIL] messages-valid | module: whatsapp/messages/route.ts | pré-requisito: criar lead falhou, status=${leadRes.status}`);
+      return;
+    }
+    const lead = await leadRes.json();
+
+    const res = await apiFetch(`/api/whatsapp/messages?leadId=${lead.id}`);
+    if (res.status === 200) {
+      const data = await res.json();
+      if (data.lead && Array.isArray(data.messages)) {
+        pass("Messages: lead válido", `leadName=${data.lead.name}, msgs=${data.messages.length}`);
+      } else {
+        fail("Messages: lead válido", `[FAIL] messages-valid | module: whatsapp/messages/route.ts | expected: { lead, messages[] } | got: ${JSON.stringify(Object.keys(data))}`);
+      }
+    } else {
+      fail("Messages: lead válido", `[FAIL] messages-valid | module: whatsapp/messages/route.ts | expected: 200 | got: ${res.status}`);
+    }
+
+    // Cleanup
+    await apiFetch(`/api/leads/${lead.id}`, { method: "DELETE" });
+  });
+
+  // 11. Sync — leadId obrigatório
+  await test("POST /api/whatsapp/sync — sem leadId retorna 400", async () => {
+    const res = await apiFetch("/api/whatsapp/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (res.status === 400) {
+      const data = await res.json();
+      pass("Sync: sem leadId → 400", `error="${data.error}"`);
+    } else {
+      fail("Sync: sem leadId → 400", `[FAIL] sync-no-leadId | module: whatsapp/sync/route.ts | expected: 400 | got: ${res.status}`);
+    }
+  });
+
+  // 12. Sync — lead inexistente retorna 404
+  await test("POST /api/whatsapp/sync — lead inexistente retorna 404", async () => {
+    const res = await apiFetch("/api/whatsapp/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: "lead_inexistente_xyz" }),
+    });
+    // 404 (lead not found) or 400 (not connected)
+    if (res.status === 404 || res.status === 400) {
+      const data = await res.json();
+      pass("Sync: lead inexistente", `status=${res.status}, error="${data.error}"`);
+    } else {
+      fail("Sync: lead inexistente", `[FAIL] sync-not-found | module: whatsapp/sync/route.ts | expected: 404 or 400 | got: ${res.status}`);
+    }
+  });
+}
+
+// ==================== WHATSAPP AUTH ====================
+
+async function testWhatsAppAuth() {
+  console.log("\n🔒 WHATSAPP AUTH");
+
+  // 13. Status without auth
+  await test("GET /api/whatsapp/status — sem cookie retorna 401", async () => {
+    const saved = authCookie;
+    authCookie = "";
+    const res = await apiFetch("/api/whatsapp/status");
+    authCookie = saved;
+    if (res.status === 401) pass("WhatsApp status sem cookie → 401");
+    else fail("WhatsApp status sem cookie → 401", `[FAIL] status-no-auth | module: whatsapp/status/route.ts | expected: 401 | got: ${res.status}`);
+  });
+
+  // 14. Conversations without auth
+  await test("GET /api/whatsapp/conversations — sem cookie retorna 401", async () => {
+    const saved = authCookie;
+    authCookie = "";
+    const res = await apiFetch("/api/whatsapp/conversations");
+    authCookie = saved;
+    if (res.status === 401) pass("Conversations sem cookie → 401");
+    else fail("Conversations sem cookie → 401", `[FAIL] conversations-no-auth | module: whatsapp/conversations/route.ts | expected: 401 | got: ${res.status}`);
+  });
+
+  // 15. Messages without auth
+  await test("GET /api/whatsapp/messages — sem cookie retorna 401", async () => {
+    const saved = authCookie;
+    authCookie = "";
+    const res = await apiFetch("/api/whatsapp/messages?leadId=test");
+    authCookie = saved;
+    if (res.status === 401) pass("Messages sem cookie → 401");
+    else fail("Messages sem cookie → 401", `[FAIL] messages-no-auth | module: whatsapp/messages/route.ts | expected: 401 | got: ${res.status}`);
+  });
+
+  // 16. Send without auth
+  await test("POST /api/whatsapp/send — sem cookie retorna 401", async () => {
+    const saved = authCookie;
+    authCookie = "";
+    const res = await apiFetch("/api/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify({ phone: "5511999999999", text: "test" }),
+    });
+    authCookie = saved;
+    if (res.status === 401) pass("Send sem cookie → 401");
+    else fail("Send sem cookie → 401", `[FAIL] send-no-auth | module: whatsapp/send/route.ts | expected: 401 | got: ${res.status}`);
+  });
+
+  // 17. Sync without auth
+  await test("POST /api/whatsapp/sync — sem cookie retorna 401", async () => {
+    const saved = authCookie;
+    authCookie = "";
+    const res = await apiFetch("/api/whatsapp/sync", {
+      method: "POST",
+      body: JSON.stringify({ leadId: "test" }),
+    });
+    authCookie = saved;
+    if (res.status === 401) pass("Sync sem cookie → 401");
+    else fail("Sync sem cookie → 401", `[FAIL] sync-no-auth | module: whatsapp/sync/route.ts | expected: 401 | got: ${res.status}`);
+  });
+}
+
+// ==================== WHATSAPP CONVERSATIONS FLOW ====================
+
+async function testWhatsAppConversationsFlow() {
+  console.log("\n💬 WHATSAPP CONVERSATIONS FLOW");
+
+  let testLeadId = "";
+
+  // 18. Criar lead com telefone, verificar que NÃO aparece em conversations (sem mensagens)
+  await test("Conversations — lead sem mensagens não aparece", async () => {
+    const leadRes = await apiFetch("/api/leads", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Lead Sem Msgs",
+        phone: "5511777776666",
+        origin: "manual",
+      }),
+    });
+    if (leadRes.status !== 201) {
+      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | pré-requisito: criar lead falhou, status=${leadRes.status}`);
+      return;
+    }
+    const lead = await leadRes.json();
+    testLeadId = lead.id;
+
+    const convRes = await apiFetch("/api/whatsapp/conversations");
+    if (convRes.status !== 200) {
+      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | expected: 200 | got: ${convRes.status}`);
+      return;
+    }
+    const convs: Array<{ leadId: string }> = await convRes.json();
+    const found = convs.some((c) => c.leadId === testLeadId);
+    if (!found) {
+      pass("Lead sem msgs não aparece", `leadId=${testLeadId} ausente — correto`);
+    } else {
+      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | expected: lead ausente | got: lead presente em conversations`);
+    }
+  });
+
+  // 19. Messages endpoint retorna lead + array vazio para lead sem mensagens
+  await test("Messages — lead sem mensagens retorna array vazio", async () => {
+    if (!testLeadId) { fail("Lead sem msgs → array vazio", "pré-requisito: lead não criado"); return; }
+
+    const res = await apiFetch(`/api/whatsapp/messages?leadId=${testLeadId}`);
+    if (res.status !== 200) {
+      fail("Lead sem msgs → array vazio", `[FAIL] msgs-empty | module: whatsapp/messages/route.ts | expected: 200 | got: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+    if (data.lead && Array.isArray(data.messages) && data.messages.length === 0) {
+      pass("Lead sem msgs → array vazio", `lead=${data.lead.name}`);
+    } else {
+      fail("Lead sem msgs → array vazio", `[FAIL] msgs-empty | module: whatsapp/messages/route.ts | expected: 0 messages | got: ${data.messages?.length}`);
+    }
+  });
+
+  // 20. Conversations ordering — most recent first
+  await test("Conversations — ordenação por lastMessageAt desc", async () => {
+    const convRes = await apiFetch("/api/whatsapp/conversations");
+    if (convRes.status !== 200) {
+      fail("Conversations ordering", `[FAIL] conv-order | module: whatsapp/conversations/route.ts | expected: 200 | got: ${convRes.status}`);
+      return;
+    }
+    const convs: Array<{ leadId: string; lastMessage: { timestamp: string } | null }> = await convRes.json();
+    if (convs.length < 2) {
+      pass("Conversations ordering", "menos de 2 conversations — não verificável");
+      return;
+    }
+    let ordered = true;
+    for (let i = 1; i < convs.length; i++) {
+      const prev = convs[i - 1].lastMessage?.timestamp;
+      const curr = convs[i].lastMessage?.timestamp;
+      if (prev && curr && new Date(prev).getTime() < new Date(curr).getTime()) {
+        ordered = false;
+        break;
+      }
+    }
+    if (ordered) {
+      pass("Conversations ordering", `${convs.length} conversas em ordem desc`);
+    } else {
+      fail("Conversations ordering", `[FAIL] conv-order | module: whatsapp/conversations/route.ts | expected: descending order | got: out of order`);
+    }
+  });
+
+  // Cleanup test lead
+  if (testLeadId) {
+    await apiFetch(`/api/leads/${testLeadId}`, { method: "DELETE" });
+  }
+}
+
+// ==================== WHATSAPP WEBHOOK COMPREHENSIVE ====================
+
+async function testWhatsAppWebhook() {
+  console.log("\n📨 WHATSAPP WEBHOOK");
+
+  // 21. Valid incoming message creates lead and message
+  await test("Webhook — mensagem válida retorna ok", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "messages.upsert",
+        instance: "test-instance-webhook",
+        data: {
+          key: { remoteJid: "5511999998888@s.whatsapp.net", fromMe: false },
+          message: { conversation: "Ola, quero saber mais" },
+          pushName: "Teste Webhook Lead",
+        },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook mensagem válida", "ok=true");
+    } else {
+      fail("Webhook mensagem válida", `[FAIL] webhook-valid | module: whatsapp/webhook/route.ts | expected: 200 + ok=true | got: ${res.status} | body: ${JSON.stringify(body)}`);
+    }
+  });
+
+  // 22. Non-message event ignored
+  await test("Webhook — evento connection.update ignorado", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "connection.update",
+        instance: "test-instance",
+        data: { state: "open" },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook connection.update ignorado", "ok=true");
+    } else {
+      fail("Webhook connection.update ignorado", `[FAIL] webhook-connection | module: whatsapp/webhook/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 23. fromMe messages ignored
+  await test("Webhook — fromMe:true ignorado", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "messages.upsert",
+        instance: "test-instance",
+        data: {
+          key: { remoteJid: "5511999998888@s.whatsapp.net", fromMe: true },
+          message: { conversation: "Mensagem enviada por mim" },
+          pushName: "Eu",
+        },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook fromMe ignorado", "ok=true");
+    } else {
+      fail("Webhook fromMe ignorado", `[FAIL] webhook-fromMe | module: whatsapp/webhook/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 24. Missing instanceName
+  await test("Webhook — sem instanceName retorna ok (não crasheia)", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "messages.upsert",
+        data: {
+          key: { remoteJid: "5511999998888@s.whatsapp.net", fromMe: false },
+          message: { conversation: "Teste sem instancia" },
+          pushName: "Teste",
+        },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook sem instanceName", "ok=true — gracefully handled");
+    } else {
+      fail("Webhook sem instanceName", `[FAIL] webhook-no-instance | module: whatsapp/webhook/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 25. Empty message text ignored
+  await test("Webhook — mensagem vazia ignorada", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "messages.upsert",
+        instance: "test-instance",
+        data: {
+          key: { remoteJid: "5511999998888@s.whatsapp.net", fromMe: false },
+          message: {},
+          pushName: "Teste",
+        },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook mensagem vazia", "ok=true — ignored");
+    } else {
+      fail("Webhook mensagem vazia", `[FAIL] webhook-empty-msg | module: whatsapp/webhook/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 26. ExtendedTextMessage format
+  await test("Webhook — extendedTextMessage processado", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "messages.upsert",
+        instance: "test-instance-webhook",
+        data: {
+          key: { remoteJid: "5511999997777@s.whatsapp.net", fromMe: false },
+          message: { extendedTextMessage: { text: "Mensagem com link https://example.com" } },
+          pushName: "Teste Extended",
+        },
+      }),
+    });
+    const body = await res.json();
+    if (res.status === 200 && body.ok === true) {
+      pass("Webhook extendedTextMessage", "ok=true");
+    } else {
+      fail("Webhook extendedTextMessage", `[FAIL] webhook-extended | module: whatsapp/webhook/route.ts | expected: 200 | got: ${res.status}`);
+    }
+  });
+
+  // 27. Duplicate message handling (send same message twice quickly)
+  await test("Webhook — mensagem duplicada tratada", async () => {
+    const payload = {
+      event: "messages.upsert",
+      instance: "test-instance-webhook",
+      data: {
+        key: { remoteJid: "5511999996666@s.whatsapp.net", fromMe: false },
+        message: { conversation: "Mensagem duplicada teste " + Date.now() },
+        pushName: "Teste Dup",
+      },
+    };
+    const res1 = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const res2 = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body1 = await res1.json();
+    const body2 = await res2.json();
+    if (res1.status === 200 && res2.status === 200 && body1.ok && body2.ok) {
+      pass("Webhook duplicata", "ambas retornaram ok=true (dedup no DB)");
+    } else {
+      fail("Webhook duplicata", `[FAIL] webhook-dup | module: whatsapp/webhook/route.ts | res1=${res1.status} res2=${res2.status}`);
+    }
+  });
+
+  // 28. Invalid JSON body
+  await test("Webhook — JSON inválido não crasheia", async () => {
+    const res = await fetch(`${BASE}/api/whatsapp/webhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+    // Should return 200 (webhook always returns ok to prevent retries) or 400
+    if (res.status === 200 || res.status === 400) {
+      pass("Webhook JSON inválido", `status=${res.status} — handled gracefully`);
+    } else {
+      fail("Webhook JSON inválido", `[FAIL] webhook-bad-json | module: whatsapp/webhook/route.ts | expected: 200 or 400 | got: ${res.status}`);
+    }
   });
 }
 
@@ -751,6 +1259,9 @@ async function main() {
   await testAuth();
   await testLeads();
   await testWhatsApp();
+  await testWhatsAppAuth();
+  await testWhatsAppConversationsFlow();
+  await testWhatsAppWebhook();
   await testGoogleAds();
   await testAdmin();
   await testAutomations();
