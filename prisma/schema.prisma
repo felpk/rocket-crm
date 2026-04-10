@@ -35,14 +35,16 @@ model Lead {
   value       Float    @default(0)
   origin      String?
   notes       String?
-  stage       String   @default("lead") // lead, qualification, meeting, proposal, negotiation, closed
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  stage         String    @default("lead") // lead, qualification, meeting, proposal, negotiation, closed
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  messages    Message[]
+  messages       Message[]
+  automationLogs AutomationLog[]
 }
 
 model Automation {
@@ -50,8 +52,9 @@ model Automation {
   name        String
   triggerType String   // entry, followup, stage_change, keyword
   triggerConfig String // JSON config
-  actionType  String   // send_message, move_stage
-  actionConfig String  // JSON config
+  actionType  String   @default("chain") // legacy compat
+  actionConfig String  @default("{}") // legacy compat
+  actions     String   @default("[]") // JSON array of { type, config }
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -64,12 +67,15 @@ model Automation {
 
 model AutomationLog {
   id           String   @id @default(cuid())
-  status       String   // success, error
+  status       String   // success, error, skipped
   details      String?
   executedAt   DateTime @default(now())
 
   automationId String
   automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  leadId       String?
+  lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
 }
 
 model WhatsappConnection {
