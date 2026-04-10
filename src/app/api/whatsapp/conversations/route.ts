@@ -45,9 +45,12 @@ export async function GET() {
     log.info("Conversas listadas", { count: conversations.length });
     return Response.json(conversations);
   } catch (error) {
-    log.error("Falha ao listar conversas", { error: String(error) });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (msg === "Forbidden") return Response.json({ error: "Forbidden" }, { status: 403 });
+    log.error("Falha ao listar conversas", { error: msg });
     return Response.json(
-      { error: "Falha ao listar conversas", details: String(error) },
+      { error: "Falha ao listar conversas", details: msg },
       { status: 500 }
     );
   }

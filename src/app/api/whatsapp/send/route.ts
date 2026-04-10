@@ -74,9 +74,12 @@ export async function POST(req: Request) {
     log.info("Mensagem enviada e salva", { phone: cleanPhone, leadId: resolvedLeadId });
     return Response.json({ ...result, leadId: resolvedLeadId });
   } catch (error) {
-    log.error("Falha ao enviar mensagem WhatsApp", { error: String(error) });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (msg === "Forbidden") return Response.json({ error: "Forbidden" }, { status: 403 });
+    log.error("Falha ao enviar mensagem WhatsApp", { error: msg });
     return Response.json(
-      { error: "Falha ao enviar mensagem", details: String(error) },
+      { error: "Falha ao enviar mensagem", details: msg },
       { status: 500 }
     );
   }
