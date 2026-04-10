@@ -7,7 +7,7 @@ const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN!;
 const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET!;
 const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI!;
-const API_BASE = "https://googleads.googleapis.com/v18";
+const API_BASE = "https://googleads.googleapis.com/v20";
 const OAUTH_BASE = "https://oauth2.googleapis.com";
 
 function parseErrorResponse(status: number, text: string): string {
