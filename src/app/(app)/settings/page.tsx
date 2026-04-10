@@ -18,6 +18,7 @@ export default function SettingsPage() {
 
   const justConnected = searchParams.get("connected") === "google-ads";
   const error = searchParams.get("error");
+  const errorDetail = searchParams.get("detail");
 
   useEffect(() => {
     fetchGadsStatus();
@@ -65,12 +66,21 @@ export default function SettingsPage() {
         </div>
       )}
       {error && (
-        <div className="bg-error/20 border border-error/30 text-error px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
-          {error === "google-ads-denied" && "Acesso ao Google Ads foi negado."}
-          {error === "google-ads-no-accounts" && "Nenhuma conta Google Ads encontrada."}
-          {error === "google-ads-failed" && "Erro ao conectar com Google Ads."}
-          {error === "google-ads-invalid-state" && "Sessão expirada. Tente novamente."}
+        <div className="bg-error/20 border border-error/30 text-error px-4 py-3 rounded-lg mb-6">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>
+              {error === "google-ads-denied" && "Acesso ao Google Ads foi negado."}
+              {error === "google-ads-no-accounts" && "Nenhuma conta Google Ads encontrada. Verifique se a conta tem acesso ao Google Ads."}
+              {error === "google-ads-failed" && "Erro ao conectar com Google Ads."}
+              {error === "google-ads-invalid-state" && "Sessão expirada. Tente novamente."}
+            </span>
+          </div>
+          {errorDetail && (
+            <pre className="mt-2 text-xs text-white/50 whitespace-pre-wrap break-all bg-black/20 rounded p-2">
+              {errorDetail}
+            </pre>
+          )}
         </div>
       )}
 
