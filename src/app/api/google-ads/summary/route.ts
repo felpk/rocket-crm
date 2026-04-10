@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { getValidToken, getAccountSummary } from "@/lib/google-ads";
+import { getValidToken, getAccountSummary, parseGoogleAdsError } from "@/lib/google-ads";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("google-ads/summary");
@@ -30,9 +30,13 @@ export async function GET(req: Request) {
     log.info("Summary carregado", summary);
     return Response.json(summary);
   } catch (error) {
-    log.error("Falha ao buscar métricas", { error: String(error) });
+    const details = String(error);
+    log.error("Falha ao buscar métricas", { error: details });
+
+    // Detect common Google Ads issues and return user-friendly messages
+    const userMessage = parseGoogleAdsError(details);
     return Response.json(
-      { error: "Falha ao buscar métricas", details: String(error) },
+      { error: userMessage, details },
       { status: 500 }
     );
   }

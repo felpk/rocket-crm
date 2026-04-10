@@ -25,6 +25,43 @@ function parseErrorResponse(status: number, text: string): string {
   }
 }
 
+// --- Error parsing ---
+
+export function parseGoogleAdsError(errorString: string): string {
+  const lower = errorString.toLowerCase();
+
+  if (lower.includes("not_ads_user") || lower.includes("not an ads user")) {
+    return "Esta conta Google não possui uma conta Google Ads associada. Crie uma conta em ads.google.com primeiro.";
+  }
+  if (lower.includes("customer_not_enabled") || lower.includes("account is not enabled")) {
+    return "A conta Google Ads existe mas não está ativada. Finalize a configuração em ads.google.com.";
+  }
+  if (lower.includes("not_active") || lower.includes("account.*suspended") || lower.includes("canceled")) {
+    return "A conta Google Ads está suspensa ou cancelada. Verifique o status em ads.google.com.";
+  }
+  if (lower.includes("billing") || lower.includes("payment")) {
+    return "Configuração de faturamento pendente na conta Google Ads. Configure o método de pagamento em ads.google.com.";
+  }
+  if (lower.includes("permission") || lower.includes("access_denied") || lower.includes("authorization")) {
+    return "Sem permissão para acessar esta conta Google Ads. Reconecte nas configurações.";
+  }
+  if (lower.includes("developer_token") || lower.includes("developer token")) {
+    return "Erro de configuração do developer token. Contate o suporte.";
+  }
+  if (lower.includes("rate_limit") || lower.includes("quota")) {
+    return "Limite de requisições da API Google Ads atingido. Tente novamente em alguns minutos.";
+  }
+  if (lower.includes("invalid_customer_id") || lower.includes("customer_id")) {
+    return "ID da conta Google Ads é inválido. Reconecte nas configurações.";
+  }
+
+  // Fallback: return a cleaned version of the error
+  const cleanError = errorString
+    .replace(/^Error:\s*/i, "")
+    .replace(/^Google Ads API:\s*/i, "");
+  return cleanError.length > 200 ? cleanError.slice(0, 200) + "..." : cleanError;
+}
+
 // --- OAuth ---
 
 export function getAuthUrl(state: string): string {

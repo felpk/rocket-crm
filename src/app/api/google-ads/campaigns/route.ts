@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { getValidToken, getCampaignMetrics } from "@/lib/google-ads";
+import { getValidToken, getCampaignMetrics, parseGoogleAdsError } from "@/lib/google-ads";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("google-ads/campaigns");
@@ -31,9 +31,12 @@ export async function GET(req: Request) {
     log.info("Campanhas carregadas", { count: campaigns.length });
     return Response.json(campaigns);
   } catch (error) {
-    log.error("Falha ao buscar campanhas", { error: String(error) });
+    const details = String(error);
+    log.error("Falha ao buscar campanhas", { error: details });
+
+    const userMessage = parseGoogleAdsError(details);
     return Response.json(
-      { error: "Falha ao buscar campanhas", details: String(error) },
+      { error: userMessage, details },
       { status: 500 }
     );
   }

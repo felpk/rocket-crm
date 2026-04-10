@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import {
+  AlertTriangle,
   BarChart3,
   Eye,
   MousePointer,
@@ -62,8 +63,16 @@ export default function GoogleAdsPage() {
 
       if (summaryRes.ok) setSummary(await summaryRes.json());
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
-      if (!summaryRes.ok && !campaignsRes.ok) {
-        setError("Não foi possível carregar os dados. Verifique a conexão.");
+
+      if (!summaryRes.ok || !campaignsRes.ok) {
+        // Get the error message from whichever failed
+        const failedRes = !summaryRes.ok ? summaryRes : campaignsRes;
+        try {
+          const errData = await failedRes.json();
+          setError(errData.error || "Não foi possível carregar os dados.");
+        } catch {
+          setError("Não foi possível carregar os dados. Verifique a conexão.");
+        }
       }
     } catch {
       setError("Erro ao conectar com a API do Google Ads.");
@@ -107,20 +116,29 @@ export default function GoogleAdsPage() {
     );
   }
 
-  if (error) {
+  // If error and no data at all, show full-page error
+  if (error && !summary && campaigns.length === 0) {
     return (
       <div>
         <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
         <div className="bg-card rounded-xl p-12 text-center">
-          <BarChart3 className="w-12 h-12 text-error mx-auto mb-4 opacity-50" />
-          <h2 className="text-lg font-semibold mb-2">Erro</h2>
-          <p className="text-white/50 text-sm mb-4">{error}</p>
-          <button
-            onClick={checkAndLoad}
-            className="bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Tentar novamente
-          </button>
+          <BarChart3 className="w-12 h-12 text-red-400 mx-auto mb-4 opacity-50" />
+          <h2 className="text-lg font-semibold mb-2">Erro ao carregar dados</h2>
+          <p className="text-white/70 text-sm mb-6 max-w-lg mx-auto">{error}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={checkAndLoad}
+              className="bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Tentar novamente
+            </button>
+            <Link
+              href="/settings"
+              className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Configurações
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -163,6 +181,17 @@ export default function GoogleAdsPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
 
+      {/* Warning banner for partial errors */}
+      {error && (summary || campaigns.length > 0) && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-yellow-200 text-sm font-medium">Atenção</p>
+            <p className="text-yellow-200/70 text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {kpis.map((kpi) => (
@@ -175,6 +204,22 @@ export default function GoogleAdsPage() {
           </div>
         ))}
       </div>
+
+      {/* Zero metrics hint */}
+      {summary && summary.impressions === 0 && summary.clicks === 0 && campaigns.length > 0 && (
+        <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-white/80 text-sm font-medium">Campanhas sem dados</p>
+            <p className="text-white/50 text-sm">
+              Suas campanhas foram encontradas, mas nenhuma gerou impressões nos
+              últimos 30 dias. Verifique no Google Ads se a configuração está
+              completa: anúncios aprovados, palavras-chave, orçamento definido e
+              faturamento ativo.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Campaigns table */}
       <h2 className="text-lg font-semibold mb-4">Campanhas</h2>
@@ -232,7 +277,12 @@ export default function GoogleAdsPage() {
               {campaigns.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-white/40">
-                    Nenhuma campanha encontrada nos últimos 30 dias
+                    <p>Nenhuma campanha encontrada nos últimos 30 dias.</p>
+                    <p className="text-xs mt-1">
+                      Se você criou campanhas recentemente, verifique se estão
+                      ativas e com configuração completa (anúncios, palavras-chave
+                      e faturamento) no Google Ads.
+                    </p>
                   </td>
                 </tr>
               )}
