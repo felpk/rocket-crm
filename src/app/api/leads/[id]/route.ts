@@ -49,8 +49,8 @@ export async function PATCH(
         runAutomations("stage_change", lead.userId, {
           lead: { id: updated.id, name: updated.name, email: updated.email, phone: updated.phone, company: updated.company, stage: updated.stage },
           userId: lead.userId,
-        }, (auto) => {
-          const cfg = auto.triggerConfig as StageChangeTriggerConfig;
+        }, (triggerConfig) => {
+          const cfg = triggerConfig as StageChangeTriggerConfig;
           return cfg.toStage === data.stage && (!cfg.fromStage || cfg.fromStage === lead.stage);
         }),
         new Promise(resolve => setTimeout(resolve, 5000)),

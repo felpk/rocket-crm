@@ -58,8 +58,8 @@ export async function POST(req: Request) {
       runAutomations("new_lead", session.id, {
         lead: { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone, company: lead.company, stage: lead.stage },
         userId: session.id,
-      }, (auto) => {
-        const cfg = auto.triggerConfig as NewLeadTriggerConfig;
+      }, (triggerConfig) => {
+        const cfg = triggerConfig as NewLeadTriggerConfig;
         return !cfg.origin || cfg.origin === lead.origin;
       }),
       new Promise(resolve => setTimeout(resolve, 5000)),
