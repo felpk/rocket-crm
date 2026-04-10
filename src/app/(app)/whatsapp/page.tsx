@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Phone,
   User,
+  Users,
   Clock,
   CheckCheck,
   Check,
@@ -127,10 +128,12 @@ export default function WhatsAppPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const qrRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Conversations
+  // Conversations & Contacts
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [contacts, setContacts] = useState<Conversation[]>([]);
   const [convsLoading, setConvsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<"conversas" | "contatos">("conversas");
 
   // Active chat
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
@@ -152,6 +155,9 @@ export default function WhatsAppPage() {
 
   // Mobile: show chat panel
   const [showChat, setShowChat] = useState(false);
+
+  // QR modal
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -202,6 +208,7 @@ export default function WhatsAppPage() {
           if (data?.instance?.state === "open") {
             setQrData(null);
             setQrError(null);
+            setShowQrModal(false);
             stopQrPolling();
           }
         }
@@ -214,6 +221,7 @@ export default function WhatsAppPage() {
     setQrLoading(true);
     setQrError(null);
     setQrData(null);
+    setShowQrModal(true);
     try {
       const res = await fetch("/api/whatsapp/qrcode");
       const data = await res.json();
@@ -235,7 +243,14 @@ export default function WhatsAppPage() {
       const res = await fetch("/api/whatsapp/conversations");
       if (res.ok) {
         const data = await res.json();
-        setConversations(data);
+        // Support both old format (array) and new format ({ conversations, contacts })
+        if (Array.isArray(data)) {
+          setConversations(data);
+          setContacts([]);
+        } else {
+          setConversations(data.conversations || []);
+          setContacts(data.contacts || []);
+        }
       }
     } catch { /* ignore */ }
     setConvsLoading(false);
@@ -275,7 +290,7 @@ export default function WhatsAppPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Poll messages when chat is open
+  // Poll messages when chat is open and connected
   useEffect(() => {
     if (activeLeadId && isConnected) {
       msgPollRef.current = setInterval(() => {
@@ -337,7 +352,6 @@ export default function WhatsAppPage() {
       });
       if (res.ok) {
         setNewMessage("");
-        // Refresh messages and conversation list
         if (activeLeadId) await loadMessages(activeLeadId);
         loadConversations();
       }
@@ -365,7 +379,6 @@ export default function WhatsAppPage() {
         setNewMessage("");
         setNewPhone("");
         setShowNewChat(false);
-        // Reload conversations and open the new one
         await loadConversations();
         if (data.leadId) {
           openChat(data.leadId);
@@ -383,14 +396,14 @@ export default function WhatsAppPage() {
     return () => stopQrPolling();
   }, [loadConversations]);
 
-  // Reload conversations when connected
   useEffect(() => {
     if (isConnected) loadConversations();
   }, [isConnected, loadConversations]);
 
-  /* ───────── Filter conversations ───────── */
+  /* ───────── Filter ───────── */
 
-  const filtered = conversations.filter((c) => {
+  const currentList = activeTab === "conversas" ? conversations : contacts;
+  const filtered = currentList.filter((c) => {
     const term = searchTerm.toLowerCase();
     return (
       c.name.toLowerCase().includes(term) ||
@@ -399,61 +412,57 @@ export default function WhatsAppPage() {
     );
   });
 
+  /* ───────── Render conversation item ───────── */
+
+  function renderConvItem(conv: Conversation) {
+    return (
+      <button
+        key={conv.leadId}
+        onClick={() => openChat(conv.leadId)}
+        className={cn(
+          "w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5",
+          activeLeadId === conv.leadId && "bg-white/10"
+        )}
+      >
+        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+          <span className="text-sm font-bold text-accent">
+            {conv.name.charAt(0).toUpperCase()}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-sm truncate">{conv.name}</span>
+            {conv.lastMessage && (
+              <span className="text-xs text-white/40 flex-shrink-0 ml-2">
+                {formatTime(conv.lastMessage.timestamp)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 mt-0.5">
+            {conv.lastMessage?.fromMe && (
+              <CheckCheck className="w-3 h-3 text-accent flex-shrink-0" />
+            )}
+            <p className="text-xs text-white/50 truncate">
+              {conv.lastMessage?.content || (conv.phone || "Sem mensagens")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            {conv.phone && (
+              <span className="text-xs text-white/30">{conv.phone}</span>
+            )}
+            <span className={cn("text-xs px-1.5 py-0.5 rounded", STAGE_COLORS[conv.stage] || "bg-white/10 text-white/50")}>
+              {STAGE_LABELS[conv.stage] || conv.stage}
+            </span>
+          </div>
+        </div>
+      </button>
+    );
+  }
+
   /* ═══════════════════════════════════════════════════════════
      Render
      ═══════════════════════════════════════════════════════════ */
 
-  // Disconnected state — show connection panel
-  if (!isConnected && !connLoading) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">WhatsApp</h1>
-        <div className="bg-card rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <WifiOff className="w-6 h-6 text-error" />
-            <div>
-              <h2 className="font-semibold">WhatsApp Desconectado</h2>
-              <p className="text-sm text-white/60">
-                Conecte seu WhatsApp para acessar as conversas
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={loadQrCode}
-            disabled={qrLoading}
-            className="bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            {qrLoading ? "Conectando..." : "Conectar WhatsApp"}
-          </button>
-
-          {qrError && (
-            <div className="mt-4 px-4 py-3 rounded-lg text-sm bg-error/20 text-error">
-              {qrError}
-            </div>
-          )}
-
-          {qrData && (
-            <div className="mt-6 text-center">
-              <p className="text-sm text-white/60 mb-3">
-                Escaneie o QR Code com seu WhatsApp para conectar
-              </p>
-              <div className="flex justify-center">
-                <img
-                  src={qrData}
-                  alt="QR Code WhatsApp"
-                  className="w-64 h-64 rounded-lg bg-white p-2"
-                />
-              </div>
-              <p className="text-xs text-white/40 mt-2">Aguardando conexao...</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Loading
   if (connLoading) {
     return (
       <div>
@@ -465,20 +474,64 @@ export default function WhatsAppPage() {
     );
   }
 
-  /* ───── Connected: Chat Interface ───── */
-
   return (
     <div className="flex flex-col h-[calc(100vh-2rem)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">WhatsApp</h1>
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-success/20 text-success">
-            <Wifi className="w-3 h-3" />
-            Conectado
-          </span>
+          {isConnected ? (
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-success/20 text-success">
+              <Wifi className="w-3 h-3" />
+              Conectado
+            </span>
+          ) : (
+            <button
+              onClick={loadQrCode}
+              disabled={qrLoading}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-error/20 text-error hover:bg-error/30 transition-colors"
+            >
+              <WifiOff className="w-3 h-3" />
+              {qrLoading ? "Conectando..." : "Desconectado — Conectar"}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQrModal && !isConnected && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => { setShowQrModal(false); stopQrPolling(); }}>
+          <div className="bg-card rounded-xl p-6 max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-semibold mb-3 text-center">Conectar WhatsApp</h2>
+            {qrError && (
+              <div className="mb-3 px-4 py-3 rounded-lg text-sm bg-error/20 text-error">
+                {qrError}
+              </div>
+            )}
+            {qrData ? (
+              <div className="text-center">
+                <p className="text-sm text-white/60 mb-3">
+                  Escaneie o QR Code com seu WhatsApp
+                </p>
+                <img
+                  src={qrData}
+                  alt="QR Code WhatsApp"
+                  className="w-64 h-64 rounded-lg bg-white p-2 mx-auto"
+                />
+                <p className="text-xs text-white/40 mt-2">Aguardando conexao...</p>
+              </div>
+            ) : qrLoading ? (
+              <p className="text-center text-white/60 py-8">Gerando QR Code...</p>
+            ) : null}
+            <button
+              onClick={() => { setShowQrModal(false); stopQrPolling(); }}
+              className="mt-4 w-full text-sm text-white/50 hover:text-white transition-colors py-2"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Chat container */}
       <div className="flex flex-1 bg-card rounded-xl overflow-hidden min-h-0">
@@ -496,7 +549,7 @@ export default function WhatsAppPage() {
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar conversa..."
+                placeholder="Buscar conversa ou contato..."
                 className="w-full bg-background border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-accent"
               />
             </div>
@@ -507,7 +560,6 @@ export default function WhatsAppPage() {
               + Nova conversa
             </button>
 
-            {/* New chat input */}
             {showNewChat && (
               <form onSubmit={handleNewChatSend} className="space-y-2">
                 <input
@@ -534,62 +586,60 @@ export default function WhatsAppPage() {
             )}
           </div>
 
-          {/* Conversation list */}
+          {/* Tabs: Conversas / Contatos */}
+          <div className="flex border-b border-white/10">
+            <button
+              onClick={() => setActiveTab("conversas")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors",
+                activeTab === "conversas"
+                  ? "text-accent border-b-2 border-accent"
+                  : "text-white/40 hover:text-white/60"
+              )}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Conversas
+              {conversations.length > 0 && (
+                <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">
+                  {conversations.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("contatos")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors",
+                activeTab === "contatos"
+                  ? "text-accent border-b-2 border-accent"
+                  : "text-white/40 hover:text-white/60"
+              )}
+            >
+              <Users className="w-3.5 h-3.5" />
+              Contatos
+              {contacts.length > 0 && (
+                <span className="text-xs bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full">
+                  {contacts.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* List */}
           <div className="flex-1 overflow-y-auto">
-            {convsLoading && conversations.length === 0 ? (
+            {convsLoading && currentList.length === 0 ? (
               <div className="p-4 text-center text-white/40 text-sm">
-                Carregando conversas...
+                Carregando...
               </div>
             ) : filtered.length === 0 ? (
               <div className="p-4 text-center text-white/40 text-sm">
-                {searchTerm ? "Nenhuma conversa encontrada" : "Nenhuma conversa ainda"}
+                {searchTerm
+                  ? "Nenhum resultado"
+                  : activeTab === "conversas"
+                  ? "Nenhuma conversa ainda"
+                  : "Nenhum contato com telefone"}
               </div>
             ) : (
-              filtered.map((conv) => (
-                <button
-                  key={conv.leadId}
-                  onClick={() => openChat(conv.leadId)}
-                  className={cn(
-                    "w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5",
-                    activeLeadId === conv.leadId && "bg-white/10"
-                  )}
-                >
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-bold text-accent">
-                      {conv.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm truncate">{conv.name}</span>
-                      {conv.lastMessage && (
-                        <span className="text-xs text-white/40 flex-shrink-0 ml-2">
-                          {formatTime(conv.lastMessage.timestamp)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      {conv.lastMessage?.fromMe && (
-                        <CheckCheck className="w-3 h-3 text-accent flex-shrink-0" />
-                      )}
-                      <p className="text-xs text-white/50 truncate">
-                        {conv.lastMessage?.content || "Sem mensagens"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      {conv.phone && (
-                        <span className="text-xs text-white/30">{conv.phone}</span>
-                      )}
-                      <span className={cn("text-xs px-1.5 py-0.5 rounded", STAGE_COLORS[conv.stage] || "bg-white/10 text-white/50")}>
-                        {STAGE_LABELS[conv.stage] || conv.stage}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))
+              filtered.map(renderConvItem)
             )}
           </div>
         </div>
@@ -602,7 +652,6 @@ export default function WhatsAppPage() {
           )}
         >
           {!activeLeadId ? (
-            /* Empty state */
             <div className="flex-1 flex items-center justify-center text-white/30">
               <div className="text-center">
                 <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -639,6 +688,9 @@ export default function WhatsAppPage() {
                         {STAGE_LABELS[activeLead.stage] || activeLead.stage}
                       </span>
                     )}
+                    {!isConnected && (
+                      <span className="text-xs text-yellow-400">offline</span>
+                    )}
                     {syncResult && (
                       <span className={cn("text-xs", syncResult.startsWith("Erro") ? "text-error" : "text-success")}>
                         {syncResult}
@@ -648,8 +700,8 @@ export default function WhatsAppPage() {
                 </div>
                 <button
                   onClick={handleSync}
-                  disabled={syncing}
-                  title="Sincronizar mensagens do WhatsApp"
+                  disabled={syncing || !isConnected}
+                  title={isConnected ? "Sincronizar mensagens do WhatsApp" : "Conecte o WhatsApp para sincronizar"}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={cn("w-5 h-5 text-white/60", syncing && "animate-spin")} />
@@ -664,7 +716,7 @@ export default function WhatsAppPage() {
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center text-white/40 text-sm py-8">
-                    Nenhuma mensagem ainda
+                    Nenhuma mensagem ainda — envie a primeira!
                   </div>
                 ) : (
                   <>

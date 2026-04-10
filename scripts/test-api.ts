@@ -265,48 +265,54 @@ async function testWhatsApp() {
     else fail("WhatsApp send: text sem phone → 400", `[FAIL] send-no-phone | module: whatsapp/send/route.ts | expected: 400 | got: ${res.status}`);
   });
 
-  // 5. Send when not connected — returns 400 with descriptive error
-  await test("POST /api/whatsapp/send — sem conexão retorna 400", async () => {
+  // 5. Send when not connected — saves locally, returns 200 with sent=false
+  await test("POST /api/whatsapp/send — sem conexão salva localmente", async () => {
+    const testPhone = `55119${Date.now().toString().slice(-8)}`;
     const res = await apiFetch("/api/whatsapp/send", {
       method: "POST",
-      body: JSON.stringify({ phone: "5511999999999", text: "Teste" }),
+      body: JSON.stringify({ phone: testPhone, text: "Teste offline" }),
     });
-    // Should be 400 (not connected) or 500 (evolution API unreachable)
-    if (res.status === 400) {
+    if (res.status === 200) {
       const data = await res.json();
-      pass("WhatsApp send: sem conexão → 400", `error="${data.error}"`);
-    } else if (res.status === 500) {
-      pass("WhatsApp send: sem conexão → 500 (evolution API)", "");
+      if (data.leadId && data.sent === false) {
+        pass("WhatsApp send: sem conexão → salva local", `leadId=${data.leadId}, sent=false`);
+        // Cleanup
+        await apiFetch(`/api/leads/${data.leadId}`, { method: "DELETE" });
+      } else {
+        pass("WhatsApp send: sem conexão → 200", `leadId=${data.leadId}, sent=${data.sent}`);
+        if (data.leadId) await apiFetch(`/api/leads/${data.leadId}`, { method: "DELETE" });
+      }
     } else {
-      fail("WhatsApp send: sem conexão", `[FAIL] send-disconnected | module: whatsapp/send/route.ts | expected: 400 or 500 | got: ${res.status}`);
+      fail("WhatsApp send: sem conexão", `[FAIL] send-disconnected | module: whatsapp/send/route.ts | expected: 200 | got: ${res.status}`);
     }
   });
 
-  // 6. Conversations endpoint — returns array
-  await test("GET /api/whatsapp/conversations — retorna array", async () => {
+  // 6. Conversations endpoint — returns { conversations, contacts }
+  await test("GET /api/whatsapp/conversations — retorna conversations e contacts", async () => {
     const res = await apiFetch("/api/whatsapp/conversations");
     if (res.status === 200) {
       const data = await res.json();
-      if (!Array.isArray(data)) {
-        fail("Conversations: retorna array", `[FAIL] conversations-array | module: whatsapp/conversations/route.ts | expected: array | got: ${typeof data}`);
-        return;
+      if (Array.isArray(data.conversations) && Array.isArray(data.contacts)) {
+        pass("Conversations: formato correto", `conversations=${data.conversations.length}, contacts=${data.contacts.length}`);
+      } else {
+        fail("Conversations: formato correto", `[FAIL] conversations-format | module: whatsapp/conversations/route.ts | expected: { conversations[], contacts[] } | got: ${JSON.stringify(Object.keys(data))}`);
       }
-      pass("Conversations: retorna array", `count=${data.length}`);
     } else {
-      fail("Conversations: retorna array", `[FAIL] conversations-array | module: whatsapp/conversations/route.ts | expected: 200 | got: ${res.status}`);
+      fail("Conversations: formato correto", `[FAIL] conversations-format | module: whatsapp/conversations/route.ts | expected: 200 | got: ${res.status}`);
     }
   });
 
   // 7. Conversations shape validation
-  await test("GET /api/whatsapp/conversations — shape correto", async () => {
+  await test("GET /api/whatsapp/conversations — shape correto dos items", async () => {
     const res = await apiFetch("/api/whatsapp/conversations");
     if (res.status !== 200) {
       fail("Conversations: shape", `[FAIL] conversations-shape | module: whatsapp/conversations/route.ts | expected: 200 | got: ${res.status}`);
       return;
     }
     const data = await res.json();
-    if (data.length > 0) {
-      const conv = data[0];
+    const allItems = [...(data.conversations || []), ...(data.contacts || [])];
+    if (allItems.length > 0) {
+      const conv = allItems[0];
       const hasFields = "leadId" in conv && "name" in conv && "phone" in conv && "stage" in conv && "lastMessage" in conv && "messageCount" in conv;
       if (hasFields) {
         pass("Conversations: shape correto", `fields=leadId,name,phone,stage,lastMessage,messageCount`);
@@ -314,7 +320,7 @@ async function testWhatsApp() {
         fail("Conversations: shape correto", `[FAIL] conversations-shape | module: whatsapp/conversations/route.ts | expected: leadId,name,phone,stage,lastMessage,messageCount | got: ${Object.keys(conv).join(",")}`);
       }
     } else {
-      pass("Conversations: shape correto", "array vazio — shape não verificável");
+      pass("Conversations: shape correto", "listas vazias — shape não verificável");
     }
   });
 
@@ -474,8 +480,8 @@ async function testWhatsAppConversationsFlow() {
 
   let testLeadId = "";
 
-  // 18. Criar lead com telefone, verificar que NÃO aparece em conversations (sem mensagens)
-  await test("Conversations — lead sem mensagens não aparece", async () => {
+  // 18. Criar lead com telefone, verificar que aparece em CONTACTS (sem mensagens)
+  await test("Conversations — lead sem mensagens aparece em contacts", async () => {
     const leadRes = await apiFetch("/api/leads", {
       method: "POST",
       body: JSON.stringify({
@@ -485,7 +491,7 @@ async function testWhatsAppConversationsFlow() {
       }),
     });
     if (leadRes.status !== 201) {
-      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | pré-requisito: criar lead falhou, status=${leadRes.status}`);
+      fail("Lead em contacts", `[FAIL] conv-contacts | module: whatsapp/conversations/route.ts | pré-requisito: criar lead falhou, status=${leadRes.status}`);
       return;
     }
     const lead = await leadRes.json();
@@ -493,15 +499,18 @@ async function testWhatsAppConversationsFlow() {
 
     const convRes = await apiFetch("/api/whatsapp/conversations");
     if (convRes.status !== 200) {
-      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | expected: 200 | got: ${convRes.status}`);
+      fail("Lead em contacts", `[FAIL] conv-contacts | module: whatsapp/conversations/route.ts | expected: 200 | got: ${convRes.status}`);
       return;
     }
-    const convs: Array<{ leadId: string }> = await convRes.json();
-    const found = convs.some((c) => c.leadId === testLeadId);
-    if (!found) {
-      pass("Lead sem msgs não aparece", `leadId=${testLeadId} ausente — correto`);
+    const data = await convRes.json();
+    const inConvs = (data.conversations || []).some((c: { leadId: string }) => c.leadId === testLeadId);
+    const inContacts = (data.contacts || []).some((c: { leadId: string }) => c.leadId === testLeadId);
+    if (!inConvs && inContacts) {
+      pass("Lead em contacts", `leadId=${testLeadId} em contacts, ausente de conversations — correto`);
+    } else if (inConvs) {
+      fail("Lead em contacts", `[FAIL] conv-contacts | expected: em contacts | got: em conversations`);
     } else {
-      fail("Lead sem msgs não aparece", `[FAIL] conv-no-msgs | module: whatsapp/conversations/route.ts | expected: lead ausente | got: lead presente em conversations`);
+      fail("Lead em contacts", `[FAIL] conv-contacts | expected: em contacts | got: ausente de ambos`);
     }
   });
 
@@ -529,7 +538,8 @@ async function testWhatsAppConversationsFlow() {
       fail("Conversations ordering", `[FAIL] conv-order | module: whatsapp/conversations/route.ts | expected: 200 | got: ${convRes.status}`);
       return;
     }
-    const convs: Array<{ leadId: string; lastMessage: { timestamp: string } | null }> = await convRes.json();
+    const data = await convRes.json();
+    const convs: Array<{ leadId: string; lastMessage: { timestamp: string } | null }> = data.conversations || [];
     if (convs.length < 2) {
       pass("Conversations ordering", "menos de 2 conversations — não verificável");
       return;

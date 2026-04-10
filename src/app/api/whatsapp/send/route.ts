@@ -21,18 +21,6 @@ export async function POST(req: Request) {
 
     const cleanPhone = phone.replace(/\D/g, "");
 
-    const connection = await prisma.whatsappConnection.findUnique({
-      where: { userId: session.id },
-    });
-
-    if (!connection || connection.status !== "connected") {
-      log.warn("WhatsApp não conectado", { userId: session.id, status: connection?.status });
-      return Response.json(
-        { error: "WhatsApp não está conectado. Conecte primeiro na página do WhatsApp." },
-        { status: 400 }
-      );
-    }
-
     // Resolve lead: use provided leadId, or find/create by phone
     let resolvedLeadId = leadId;
 
@@ -57,10 +45,7 @@ export async function POST(req: Request) {
       resolvedLeadId = lead.id;
     }
 
-    log.debug("Enviando mensagem", { instanceName: connection.instanceName, phone: cleanPhone, leadId: resolvedLeadId, textLength: text.length });
-    const result = await sendTextMessage(connection.instanceName, cleanPhone, text);
-
-    // Save message and update lastMessageAt
+    // Save message locally first (always)
     const now = new Date();
     await prisma.message.create({
       data: { content: text, fromMe: true, timestamp: now, leadId: resolvedLeadId },
@@ -71,8 +56,27 @@ export async function POST(req: Request) {
       data: { lastMessageAt: now },
     });
 
-    log.info("Mensagem enviada e salva", { phone: cleanPhone, leadId: resolvedLeadId });
-    return Response.json({ ...result, leadId: resolvedLeadId });
+    log.info("Mensagem salva localmente", { phone: cleanPhone, leadId: resolvedLeadId });
+
+    // Try to send via WhatsApp if connected
+    let sent = false;
+    const connection = await prisma.whatsappConnection.findUnique({
+      where: { userId: session.id },
+    });
+
+    if (connection && connection.status === "connected") {
+      try {
+        await sendTextMessage(connection.instanceName, cleanPhone, text);
+        sent = true;
+        log.info("Mensagem enviada via WhatsApp", { phone: cleanPhone });
+      } catch (err) {
+        log.warn("Falha ao enviar via WhatsApp (mensagem salva localmente)", { error: String(err) });
+      }
+    } else {
+      log.info("WhatsApp desconectado — mensagem salva apenas localmente", { phone: cleanPhone });
+    }
+
+    return Response.json({ leadId: resolvedLeadId, sent });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
