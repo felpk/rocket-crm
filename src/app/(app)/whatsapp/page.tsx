@@ -361,11 +361,15 @@ export default function WhatsAppPage() {
         body: JSON.stringify({ phone, text }),
       });
       if (res.ok) {
+        const data = await res.json();
         setNewMessage("");
         setNewPhone("");
         setShowNewChat(false);
-        // Reload conversations to show new one
+        // Reload conversations and open the new one
         await loadConversations();
+        if (data.leadId) {
+          openChat(data.leadId);
+        }
       }
     } catch { /* ignore */ }
     setSending(false);
