@@ -61,21 +61,35 @@ export default function GoogleAdsPage() {
         fetch("/api/google-ads/campaigns"),
       ]);
 
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
+      const errors: string[] = [];
 
-      if (!summaryRes.ok || !campaignsRes.ok) {
-        // Get the error message from whichever failed
-        const failedRes = !summaryRes.ok ? summaryRes : campaignsRes;
-        try {
-          const errData = await failedRes.json();
-          setError(errData.error || "Não foi possível carregar os dados.");
-        } catch {
-          setError("Não foi possível carregar os dados. Verifique a conexão.");
-        }
+      if (summaryRes.ok) {
+        setSummary(await summaryRes.json());
+      } else {
+        const errData = await summaryRes.json().catch(() => null);
+        const msg = errData?.error || `Summary falhou (${summaryRes.status})`;
+        const details = errData?.details || "";
+        errors.push(msg);
+        console.error("[Google Ads] Summary error:", msg, details);
       }
-    } catch {
-      setError("Erro ao conectar com a API do Google Ads.");
+
+      if (campaignsRes.ok) {
+        setCampaigns(await campaignsRes.json());
+      } else {
+        const errData = await campaignsRes.json().catch(() => null);
+        const msg = errData?.error || `Campaigns falhou (${campaignsRes.status})`;
+        const details = errData?.details || "";
+        errors.push(msg);
+        console.error("[Google Ads] Campaigns error:", msg, details);
+      }
+
+      if (errors.length > 0) {
+        setError(errors.join(" | "));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Google Ads] Fetch error:", msg);
+      setError(`Erro ao conectar com a API: ${msg}`);
     }
     setLoading(false);
   }
