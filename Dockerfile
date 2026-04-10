@@ -35,12 +35,22 @@ COPY --from=builder /app/public ./public
 # Copy Prisma generated client
 COPY --from=builder /app/src/generated/prisma ./src/generated/prisma
 
+# Copy Prisma schema + migrations + CLI for migrate deploy
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/pure-rand ./node_modules/pure-rand
+
+# Copy startup script
+COPY --from=builder /app/start.sh ./start.sh
+
 # Data directory for SQLite + Next.js cache
-RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next
+RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next /app/prisma /app/node_modules
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["sh", "start.sh"]
