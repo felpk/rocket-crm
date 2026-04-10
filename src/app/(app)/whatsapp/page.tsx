@@ -105,6 +105,23 @@ function formatPhone(value: string): string {
   return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
 }
 
+function isPhoneNumber(value: string): boolean {
+  return /^\d{8,15}$/.test(value.replace(/\D/g, ""));
+}
+
+function formatContactDisplay(name: string, phone: string | null): { displayName: string; subtitle: string } {
+  const formattedPhone = phone ? formatPhone(phone) : "";
+  // If name is same as phone (or just digits), show formatted phone as name
+  if (!name || name === phone || isPhoneNumber(name)) {
+    return { displayName: formattedPhone || name, subtitle: "" };
+  }
+  // Name is different from phone — show "Name - +55 (91) 98522-2088"
+  return {
+    displayName: formattedPhone ? `${name} - ${formattedPhone}` : name,
+    subtitle: "",
+  };
+}
+
 /* ───────── Templates ───────── */
 
 const TEMPLATE_MESSAGES = [
@@ -472,6 +489,8 @@ export default function WhatsAppPage() {
   /* ───────── Render conversation item ───────── */
 
   function renderConvItem(conv: Conversation) {
+    const { displayName } = formatContactDisplay(conv.name, conv.phone);
+    const initial = (conv.name && !isPhoneNumber(conv.name)) ? conv.name.charAt(0).toUpperCase() : (conv.phone ? conv.phone.charAt(0) : "?");
     return (
       <button
         key={conv.leadId}
@@ -487,12 +506,12 @@ export default function WhatsAppPage() {
       >
         <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
           <span className="text-sm font-bold text-accent">
-            {conv.name.charAt(0).toUpperCase()}
+            {initial}
           </span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <span className="font-medium text-sm truncate">{conv.name}</span>
+            <span className="font-medium text-sm truncate">{displayName}</span>
             {conv.lastMessage && (
               <span className="text-xs text-white/40 flex-shrink-0 ml-2">
                 {formatTime(conv.lastMessage.timestamp)}
@@ -504,13 +523,10 @@ export default function WhatsAppPage() {
               <CheckCheck className="w-3 h-3 text-accent flex-shrink-0" />
             )}
             <p className="text-xs text-white/50 truncate">
-              {conv.lastMessage?.content || (conv.phone || "Sem mensagens")}
+              {conv.lastMessage?.content || "Sem mensagens"}
             </p>
           </div>
           <div className="flex items-center gap-2 mt-1">
-            {conv.phone && (
-              <span className="text-xs text-white/30">{conv.phone}</span>
-            )}
             <span className={cn("text-xs px-1.5 py-0.5 rounded", STAGE_COLORS[conv.stage] || "bg-white/10 text-white/50")}>
               {STAGE_LABELS[conv.stage] || conv.stage}
             </span>
@@ -750,15 +766,9 @@ export default function WhatsAppPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm truncate">
-                    {activeLead?.name || "Carregando..."}
+                    {activeLead ? formatContactDisplay(activeLead.name, activeLead.phone).displayName : "Carregando..."}
                   </h3>
                   <div className="flex items-center gap-2">
-                    {activeLead?.phone && (
-                      <span className="text-xs text-white/50 flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        {activeLead.phone}
-                      </span>
-                    )}
                     {activeLead?.stage && (
                       <span className={cn("text-xs px-1.5 py-0.5 rounded", STAGE_COLORS[activeLead.stage])}>
                         {STAGE_LABELS[activeLead.stage] || activeLead.stage}

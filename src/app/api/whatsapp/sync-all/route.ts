@@ -62,7 +62,10 @@ export async function POST() {
         continue;
       }
 
-      const name = chat.pushName || phone;
+      // Try to get name from chat pushName or lastMessage pushName (if not fromMe)
+      const lastMsgPushName = chat.lastMessage?.key?.fromMe ? null : (chat.lastMessage as Record<string, unknown>)?.pushName as string | undefined;
+      const chatName = chat.pushName || lastMsgPushName;
+      const name = (chatName && chatName !== phone) ? chatName : phone;
 
       // Find or create lead
       let lead = await prisma.lead.findFirst({
@@ -97,6 +100,27 @@ export async function POST() {
           rawMessages = result.messages;
         } else if (Array.isArray(result?.data)) {
           rawMessages = result.data;
+        }
+
+        // Extract pushName from incoming messages (the contact's WhatsApp profile name)
+        let contactName: string | null = null;
+        for (const msg of rawMessages) {
+          const msgPushName = msg.pushName as string | undefined;
+          const key = msg.key as Record<string, unknown> | undefined;
+          if (msgPushName && key?.fromMe !== true && msgPushName !== phone) {
+            contactName = msgPushName;
+            break;
+          }
+        }
+
+        // Update lead name if we found a real pushName
+        if (contactName && lead.name === phone) {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: { name: contactName },
+          });
+          lead = { ...lead, name: contactName };
+          log.debug("Lead nome atualizado via pushName", { leadId: lead.id, name: contactName });
         }
 
         for (const msg of rawMessages) {
