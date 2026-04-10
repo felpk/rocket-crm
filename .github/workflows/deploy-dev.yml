@@ -1,0 +1,26 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches:
+      - develop
+      - fix/*
+      - feature/*
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/rocket/rocket-crm
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+            docker build -t rocket-crm-dev:latest .
+            docker service update --force rocket_rocket-crm-dev
