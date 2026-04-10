@@ -86,9 +86,18 @@ export async function POST() {
       // Fetch messages for this contact
       try {
         const result = await fetchMessages(connection.instanceName, phone);
-        const rawMessages: Array<Record<string, unknown>> = Array.isArray(result)
-          ? result
-          : result?.messages ?? result?.data ?? [];
+        // Evolution API v2 returns paginated: { messages: { records: [...] } }
+        // or older format: array or { messages: [...] }
+        let rawMessages: Array<Record<string, unknown>> = [];
+        if (Array.isArray(result)) {
+          rawMessages = result;
+        } else if (result?.messages?.records && Array.isArray(result.messages.records)) {
+          rawMessages = result.messages.records;
+        } else if (Array.isArray(result?.messages)) {
+          rawMessages = result.messages;
+        } else if (Array.isArray(result?.data)) {
+          rawMessages = result.data;
+        }
 
         for (const msg of rawMessages) {
           const key = msg.key as Record<string, unknown> | undefined;
