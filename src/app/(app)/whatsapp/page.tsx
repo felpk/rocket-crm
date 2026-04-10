@@ -13,6 +13,7 @@ import {
   Clock,
   CheckCheck,
   Check,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,10 @@ export default function WhatsAppPage() {
   // New conversation
   const [showNewChat, setShowNewChat] = useState(false);
   const [newPhone, setNewPhone] = useState("");
+
+  // Sync
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   // Mobile: show chat panel
   const [showChat, setShowChat] = useState(false);
@@ -281,6 +286,33 @@ export default function WhatsAppPage() {
       if (msgPollRef.current) { clearInterval(msgPollRef.current); msgPollRef.current = null; }
     };
   }, [activeLeadId, isConnected, loadMessages]);
+
+  /* ───────── Sync messages ───────── */
+
+  async function handleSync() {
+    if (!activeLeadId || syncing) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/whatsapp/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: activeLeadId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncResult(`${data.synced} mensagens sincronizadas`);
+        await loadMessages(activeLeadId);
+        loadConversations();
+      } else {
+        setSyncResult(`Erro: ${data.error}`);
+      }
+    } catch {
+      setSyncResult("Erro ao sincronizar");
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncResult(null), 4000);
+  }
 
   /* ───────── Send message ───────── */
 
@@ -603,8 +635,21 @@ export default function WhatsAppPage() {
                         {STAGE_LABELS[activeLead.stage] || activeLead.stage}
                       </span>
                     )}
+                    {syncResult && (
+                      <span className={cn("text-xs", syncResult.startsWith("Erro") ? "text-error" : "text-success")}>
+                        {syncResult}
+                      </span>
+                    )}
                   </div>
                 </div>
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  title="Sincronizar mensagens do WhatsApp"
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={cn("w-5 h-5 text-white/60", syncing && "animate-spin")} />
+                </button>
               </div>
 
               {/* Messages */}
