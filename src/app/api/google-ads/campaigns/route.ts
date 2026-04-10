@@ -11,8 +11,15 @@ const log = createLogger("google-ads/campaigns");
 
 export async function GET(req: Request) {
   log.info("GET /api/google-ads/campaigns");
+
+  let session;
   try {
-    const session = await requireAuth();
+    session = await requireAuth();
+  } catch {
+    return Response.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  try {
     const url = new URL(req.url);
     const targetUserId = url.searchParams.get("userId");
 
@@ -37,7 +44,6 @@ export async function GET(req: Request) {
       log.info("Campanhas carregadas", { count: campaigns.length });
       return Response.json(campaigns);
     } catch (apiError) {
-      // If it looks like an auth error, try refreshing the token once
       const errStr = String(apiError);
       if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
         log.warn("Token inválido, tentando renovar", { userId });

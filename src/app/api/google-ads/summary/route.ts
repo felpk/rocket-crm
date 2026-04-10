@@ -11,8 +11,15 @@ const log = createLogger("google-ads/summary");
 
 export async function GET(req: Request) {
   log.info("GET /api/google-ads/summary");
+
+  let session;
   try {
-    const session = await requireAuth();
+    session = await requireAuth();
+  } catch {
+    return Response.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  try {
     const url = new URL(req.url);
     const targetUserId = url.searchParams.get("userId");
 
