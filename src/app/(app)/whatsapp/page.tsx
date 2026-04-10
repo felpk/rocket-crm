@@ -153,6 +153,10 @@ export default function WhatsAppPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
+  // Sync all
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncAllResult, setSyncAllResult] = useState<string | null>(null);
+
   // Mobile: show chat panel
   const [showChat, setShowChat] = useState(false);
 
@@ -329,6 +333,30 @@ export default function WhatsAppPage() {
     setTimeout(() => setSyncResult(null), 4000);
   }
 
+  /* ───────── Sync all chats from WhatsApp ───────── */
+
+  async function handleSyncAll() {
+    if (syncingAll) return;
+    setSyncingAll(true);
+    setSyncAllResult(null);
+    try {
+      const res = await fetch("/api/whatsapp/sync-all", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncAllResult(`${data.importedContacts} contatos, ${data.importedMessages} mensagens importadas`);
+        await loadConversations();
+      } else {
+        setSyncAllResult(`Erro: ${data.error}`);
+      }
+    } catch {
+      setSyncAllResult("Erro ao sincronizar");
+    }
+    setSyncingAll(false);
+    setTimeout(() => setSyncAllResult(null), 6000);
+  }
+
   /* ───────── Send message ───────── */
 
   async function handleSend(e: React.FormEvent) {
@@ -494,6 +522,21 @@ export default function WhatsAppPage() {
               <WifiOff className="w-3 h-3" />
               {qrLoading ? "Conectando..." : "Desconectado — Conectar"}
             </button>
+          )}
+          {isConnected && (
+            <button
+              onClick={handleSyncAll}
+              disabled={syncingAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/20 text-accent hover:bg-accent/30 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={cn("w-3 h-3", syncingAll && "animate-spin")} />
+              {syncingAll ? "Sincronizando..." : "Importar conversas"}
+            </button>
+          )}
+          {syncAllResult && (
+            <span className={cn("text-xs", syncAllResult.startsWith("Erro") ? "text-error" : "text-success")}>
+              {syncAllResult}
+            </span>
           )}
         </div>
       </div>
