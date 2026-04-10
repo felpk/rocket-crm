@@ -3,12 +3,23 @@ import { createLogger } from "./logger";
 
 const log = createLogger("google-ads");
 
-const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN!;
-const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET!;
-const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI!;
+const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
+const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET || "";
+const REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI || "";
 const API_BASE = "https://googleads.googleapis.com/v20";
 const OAUTH_BASE = "https://oauth2.googleapis.com";
+
+function validateEnvVars() {
+  const missing: string[] = [];
+  if (!DEVELOPER_TOKEN) missing.push("GOOGLE_ADS_DEVELOPER_TOKEN");
+  if (!CLIENT_ID) missing.push("GOOGLE_ADS_CLIENT_ID");
+  if (!CLIENT_SECRET) missing.push("GOOGLE_ADS_CLIENT_SECRET");
+  if (!REDIRECT_URI) missing.push("GOOGLE_ADS_REDIRECT_URI");
+  if (missing.length > 0) {
+    throw new Error(`Variáveis de ambiente faltando: ${missing.join(", ")}`);
+  }
+}
 
 function parseErrorResponse(status: number, text: string): string {
   // Try JSON first
@@ -135,6 +146,7 @@ async function gadsFetch(
   path: string,
   options?: RequestInit
 ) {
+  validateEnvVars();
   const cleanId = customerId.replace(/-/g, "");
   const url = `${API_BASE}/customers/${cleanId}${path}`;
   log.debug("gadsFetch", { path, customerId: cleanId });
@@ -165,7 +177,14 @@ export async function getValidToken(userId: string) {
   if (!connection) return null;
 
   const fiveMinutes = 5 * 60 * 1000;
-  if (connection.tokenExpiry.getTime() - Date.now() < fiveMinutes) {
+  const tokenAge = connection.tokenExpiry.getTime() - Date.now();
+
+  // Always refresh if token is expired or expiring soon
+  if (tokenAge < fiveMinutes) {
+    log.info("Token expirado ou expirando, renovando", {
+      userId,
+      expiresIn: Math.round(tokenAge / 1000),
+    });
     try {
       const refreshed = await refreshAccessToken(connection.refreshToken);
       const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000);
@@ -180,7 +199,11 @@ export async function getValidToken(userId: string) {
         accessToken: refreshed.access_token,
         customerId: connection.customerId,
       };
-    } catch {
+    } catch (err) {
+      log.error("Falha ao renovar token, desconectando", {
+        userId,
+        error: String(err),
+      });
       await prisma.googleAdsConnection.delete({ where: { userId } });
       return null;
     }
@@ -192,9 +215,42 @@ export async function getValidToken(userId: string) {
   };
 }
 
+// --- Token retry on auth failure ---
+
+export async function refreshAndRetry<T>(
+  userId: string,
+  apiCall: (newAccessToken: string) => Promise<T>
+): Promise<T | null> {
+  const connection = await prisma.googleAdsConnection.findUnique({
+    where: { userId },
+  });
+  if (!connection) return null;
+
+  try {
+    const refreshed = await refreshAccessToken(connection.refreshToken);
+    const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000);
+    await prisma.googleAdsConnection.update({
+      where: { userId },
+      data: {
+        accessToken: refreshed.access_token,
+        tokenExpiry: newExpiry,
+      },
+    });
+    return await apiCall(refreshed.access_token);
+  } catch (err) {
+    log.error("refreshAndRetry falhou, desconectando", {
+      userId,
+      error: String(err),
+    });
+    await prisma.googleAdsConnection.delete({ where: { userId } });
+    return null;
+  }
+}
+
 // --- Data functions ---
 
 export async function listAccessibleAccounts(accessToken: string) {
+  validateEnvVars();
   log.info("Listando contas acessíveis");
   const res = await fetch(
     `${API_BASE}/customers:listAccessibleCustomers`,

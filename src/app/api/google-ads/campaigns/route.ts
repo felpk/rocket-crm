@@ -1,5 +1,10 @@
 import { requireAuth } from "@/lib/auth";
-import { getValidToken, getCampaignMetrics, parseGoogleAdsError } from "@/lib/google-ads";
+import {
+  getValidToken,
+  getCampaignMetrics,
+  parseGoogleAdsError,
+  refreshAndRetry,
+} from "@/lib/google-ads";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("google-ads/campaigns");
@@ -24,20 +29,39 @@ export async function GET(req: Request) {
       );
     }
 
-    const campaigns = await getCampaignMetrics(
-      token.customerId,
-      token.accessToken
-    );
-    log.info("Campanhas carregadas", { count: campaigns.length });
-    return Response.json(campaigns);
+    try {
+      const campaigns = await getCampaignMetrics(
+        token.customerId,
+        token.accessToken
+      );
+      log.info("Campanhas carregadas", { count: campaigns.length });
+      return Response.json(campaigns);
+    } catch (apiError) {
+      // If it looks like an auth error, try refreshing the token once
+      const errStr = String(apiError);
+      if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
+        log.warn("Token inválido, tentando renovar", { userId });
+        const result = await refreshAndRetry(userId, (newToken) =>
+          getCampaignMetrics(token.customerId, newToken)
+        );
+        if (result) {
+          log.info("Campanhas carregadas após renovação", {
+            count: result.length,
+          });
+          return Response.json(result);
+        }
+        return Response.json(
+          { error: "Google Ads desconectado. Token expirado — reconecte nas configurações." },
+          { status: 401 }
+        );
+      }
+      throw apiError;
+    }
   } catch (error) {
     const details = String(error);
     log.error("Falha ao buscar campanhas", { error: details });
 
     const userMessage = parseGoogleAdsError(details);
-    return Response.json(
-      { error: userMessage, details },
-      { status: 500 }
-    );
+    return Response.json({ error: userMessage, details }, { status: 500 });
   }
 }
