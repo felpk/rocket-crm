@@ -7,6 +7,26 @@ interface ConnectionState {
   instance: { instanceName: string; state: string };
 }
 
+const TEMPLATE_MESSAGES = [
+  { label: "Boas-vindas", text: "Olá! Seja bem-vindo(a) à Rocket Marketing. Como posso ajudar?" },
+  { label: "Follow-up", text: "Olá! Tudo bem? Estou entrando em contato para dar continuidade à nossa conversa. Posso te ajudar com algo?" },
+  { label: "Agendamento", text: "Olá! Gostaria de agendar uma reunião para conversarmos sobre como podemos ajudar seu negócio. Qual o melhor horário para você?" },
+  { label: "Proposta", text: "Olá! Conforme conversamos, estou enviando a proposta para sua análise. Fico à disposição para qualquer dúvida!" },
+  { label: "Lembrete", text: "Olá! Passando para lembrar da nossa reunião agendada. Confirma sua presença?" },
+];
+
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  // Format: +55 (11) 99999-9999
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `+${digits.slice(0, 2)} (${digits.slice(2)}`;
+  if (digits.length <= 9)
+    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4)}`;
+  if (digits.length <= 13)
+    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
+  return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
+}
+
 export default function WhatsAppPage() {
   const [connection, setConnection] = useState<ConnectionState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -233,8 +253,8 @@ export default function WhatsAppPage() {
               </label>
               <input
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="5511999999999"
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="+55 (11) 99999-9999"
                 className="w-full bg-background border border-white/10 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-accent"
               />
             </div>
@@ -242,6 +262,18 @@ export default function WhatsAppPage() {
               <label className="block text-sm text-white/70 mb-1">
                 Mensagem
               </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {TEMPLATE_MESSAGES.map((tpl) => (
+                  <button
+                    key={tpl.label}
+                    type="button"
+                    onClick={() => setMessage(tpl.text)}
+                    className="px-3 py-1 text-xs rounded-full bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                  >
+                    {tpl.label}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
