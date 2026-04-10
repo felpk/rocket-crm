@@ -15,6 +15,7 @@ import {
   CheckCheck,
   Check,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -355,6 +356,23 @@ export default function WhatsAppPage() {
     }
     setSyncingAll(false);
     setTimeout(() => setSyncAllResult(null), 6000);
+  }
+
+  /* ───────── Delete conversation ───────── */
+
+  async function handleDeleteConversation() {
+    if (!activeLeadId) return;
+    if (!confirm("Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.")) return;
+
+    try {
+      const res = await fetch(`/api/whatsapp/conversations/${activeLeadId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        closeChat();
+        await loadConversations();
+      }
+    } catch { /* ignore */ }
   }
 
   /* ───────── Send message ───────── */
@@ -748,6 +766,13 @@ export default function WhatsAppPage() {
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={cn("w-5 h-5 text-white/60", syncing && "animate-spin")} />
+                </button>
+                <button
+                  onClick={handleDeleteConversation}
+                  title="Apagar conversa"
+                  className="p-2 rounded-lg hover:bg-error/20 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5 text-white/40 hover:text-error" />
                 </button>
               </div>
 
