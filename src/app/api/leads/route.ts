@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
+import { runAutomations } from "@/lib/automations/engine";
+import type { NewLeadTriggerConfig } from "@/lib/automations/types";
 
 const log = createLogger("leads");
 
@@ -50,6 +52,19 @@ export async function POST(req: Request) {
     });
 
     log.info("Lead criado", { leadId: lead.id, name: lead.name });
+
+    // Fire new_lead automations (non-blocking with 5s timeout)
+    await Promise.race([
+      runAutomations("new_lead", session.id, {
+        lead: { id: lead.id, name: lead.name, email: lead.email, phone: lead.phone, company: lead.company, stage: lead.stage },
+        userId: session.id,
+      }, (auto) => {
+        const cfg = auto.triggerConfig as NewLeadTriggerConfig;
+        return !cfg.origin || cfg.origin === lead.origin;
+      }),
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]).catch(err => log.error("Automação new_lead falhou", { error: String(err) }));
+
     return Response.json(lead, { status: 201 });
   } catch (err) {
     log.error("Erro ao criar lead", { error: String(err) });

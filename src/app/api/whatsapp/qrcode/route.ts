@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { createInstance, getQrCode, makeInstanceName } from "@/lib/evolution";
+import { createInstance, getQrCode, makeInstanceName, setWebhook } from "@/lib/evolution";
 import { prisma } from "@/lib/db";
 import { createLogger } from "@/lib/logger";
 
@@ -30,6 +30,12 @@ export async function GET() {
             userId: session.id,
           },
         });
+
+        // Configurar webhook para receber eventos
+        const webhookUrl = `${process.env.NEXTAUTH_URL}/api/whatsapp/webhook`;
+        await setWebhook(instanceName, webhookUrl).catch(err =>
+          log.warn("Falha ao configurar webhook", { error: String(err) })
+        );
 
         // createInstance retorna qrcode como objeto { base64, code, count }
         const base64 = created.base64 || created.qrcode?.base64;
