@@ -15,7 +15,6 @@ import {
   CheckCheck,
   Check,
   RefreshCw,
-  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -163,6 +162,9 @@ export default function WhatsAppPage() {
 
   // QR modal
   const [showQrModal, setShowQrModal] = useState(false);
+
+  // Context menu
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; leadId: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const msgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -360,16 +362,16 @@ export default function WhatsAppPage() {
 
   /* ───────── Delete conversation ───────── */
 
-  async function handleDeleteConversation() {
-    if (!activeLeadId) return;
+  async function handleDeleteConversation(leadId: string) {
+    setContextMenu(null);
     if (!confirm("Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.")) return;
 
     try {
-      const res = await fetch(`/api/whatsapp/conversations/${activeLeadId}`, {
+      const res = await fetch(`/api/whatsapp/conversations/${leadId}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        closeChat();
+        if (activeLeadId === leadId) closeChat();
         await loadConversations();
       }
     } catch { /* ignore */ }
@@ -446,6 +448,15 @@ export default function WhatsAppPage() {
     if (isConnected) loadConversations();
   }, [isConnected, loadConversations]);
 
+  /* ───────── Close context menu on click anywhere ───────── */
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [contextMenu]);
+
   /* ───────── Filter ───────── */
 
   const currentList = activeTab === "conversas" ? conversations : contacts;
@@ -465,6 +476,10 @@ export default function WhatsAppPage() {
       <button
         key={conv.leadId}
         onClick={() => openChat(conv.leadId)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY, leadId: conv.leadId });
+        }}
         className={cn(
           "w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5",
           activeLeadId === conv.leadId && "bg-white/10"
@@ -767,13 +782,6 @@ export default function WhatsAppPage() {
                 >
                   <RefreshCw className={cn("w-5 h-5 text-white/60", syncing && "animate-spin")} />
                 </button>
-                <button
-                  onClick={handleDeleteConversation}
-                  title="Apagar conversa"
-                  className="p-2 rounded-lg hover:bg-error/20 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5 text-white/40 hover:text-error" />
-                </button>
               </div>
 
               {/* Messages */}
@@ -874,6 +882,21 @@ export default function WhatsAppPage() {
           )}
         </div>
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-card border border-white/10 rounded-lg shadow-xl py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => handleDeleteConversation(contextMenu.leadId)}
+            className="w-full px-4 py-2 text-sm text-left text-error hover:bg-white/5 transition-colors"
+          >
+            Apagar conversa
+          </button>
+        </div>
+      )}
     </div>
   );
 }
