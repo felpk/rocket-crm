@@ -65,8 +65,10 @@ export async function GET(req: NextRequest) {
 
     log.info("Google Ads conectado com sucesso", { userId, customerId });
   } catch (err) {
-    log.error("Erro no OAuth Google Ads", { error: String(err) });
-    redirect("/settings?error=google-ads-failed");
+    const errorMsg = String(err);
+    log.error("Erro no OAuth Google Ads", { error: errorMsg });
+    const detail = encodeURIComponent(errorMsg.slice(0, 300));
+    redirect(`/settings?error=google-ads-failed&detail=${detail}`);
   }
 
   redirect("/settings?connected=google-ads");
