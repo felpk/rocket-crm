@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import {
   getValidToken,
   getCampaignMetrics,
@@ -16,10 +17,17 @@ export async function GET(req: Request) {
   try {
     session = await requireAuth();
   } catch {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
+    return Response.json({ error: "Nao autorizado" }, { status: 401 });
   }
 
   try {
+    // Demo mode — return demo data without DB/API calls
+    if (process.env.GOOGLE_ADS_DEMO === "true") {
+      log.info("Modo demo ativo — retornando campanhas demo");
+      const campaigns = await getCampaignMetrics("demo", "demo");
+      return Response.json(campaigns);
+    }
+
     const url = new URL(req.url);
     const targetUserId = url.searchParams.get("userId");
 
@@ -29,35 +37,43 @@ export async function GET(req: Request) {
     log.debug("Buscando token Google Ads", { userId });
     const token = await getValidToken(userId);
     if (!token) {
-      log.warn("Google Ads não conectado", { userId });
+      log.warn("Google Ads nao conectado", { userId });
       return Response.json(
-        { error: "Google Ads não conectado" },
+        { error: "Google Ads nao conectado" },
         { status: 404 }
       );
     }
+
+    const syncNow = () =>
+      prisma.googleAdsConnection.update({
+        where: { userId },
+        data: { lastSyncAt: new Date() },
+      });
 
     try {
       const campaigns = await getCampaignMetrics(
         token.customerId,
         token.accessToken
       );
+      await syncNow();
       log.info("Campanhas carregadas", { count: campaigns.length });
       return Response.json(campaigns);
     } catch (apiError) {
       const errStr = String(apiError);
       if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
-        log.warn("Token inválido, tentando renovar", { userId });
+        log.warn("Token invalido, tentando renovar", { userId });
         const result = await refreshAndRetry(userId, (newToken) =>
           getCampaignMetrics(token.customerId, newToken)
         );
         if (result) {
-          log.info("Campanhas carregadas após renovação", {
+          await syncNow();
+          log.info("Campanhas carregadas apos renovacao", {
             count: result.length,
           });
           return Response.json(result);
         }
         return Response.json(
-          { error: "Google Ads desconectado. Token expirado — reconecte nas configurações." },
+          { error: "Google Ads desconectado. Token expirado - reconecte nas configuracoes." },
           { status: 401 }
         );
       }

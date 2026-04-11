@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import {
   AlertTriangle,
   BarChart3,
+  Clock,
   Eye,
   MousePointer,
   Percent,
@@ -31,12 +32,23 @@ interface Campaign {
   spend: number;
 }
 
+function formatTimestamp(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export default function GoogleAdsPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [connectedAt, setConnectedAt] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     checkAndLoad();
@@ -55,6 +67,8 @@ export default function GoogleAdsPage() {
       }
 
       setConnected(true);
+      if (status.lastSyncAt) setLastSyncAt(status.lastSyncAt);
+      if (status.connectedAt) setConnectedAt(status.connectedAt);
 
       const [summaryRes, campaignsRes] = await Promise.all([
         fetch("/api/google-ads/summary"),
@@ -75,6 +89,7 @@ export default function GoogleAdsPage() {
 
       if (campaignsRes.ok) {
         setCampaigns(await campaignsRes.json());
+        setLastSyncAt(new Date().toISOString());
       } else {
         const errData = await campaignsRes.json().catch(() => null);
         const msg = errData?.error || `Campaigns falhou (${campaignsRes.status})`;
@@ -100,7 +115,7 @@ export default function GoogleAdsPage() {
         <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
         <div className="bg-card rounded-xl p-12 text-center">
           <BarChart3 className="w-10 h-10 text-accent mx-auto mb-3 animate-pulse" />
-          <p className="text-white/50">Carregando métricas...</p>
+          <p className="text-white/50">Carregando metricas...</p>
         </div>
       </div>
     );
@@ -113,17 +128,17 @@ export default function GoogleAdsPage() {
         <div className="bg-card rounded-xl p-12 text-center">
           <Link2 className="w-12 h-12 text-accent mx-auto mb-4 opacity-50" />
           <h2 className="text-lg font-semibold mb-2">
-            Google Ads não conectado
+            Google Ads nao conectado
           </h2>
           <p className="text-white/50 text-sm mb-6 max-w-md mx-auto">
-            Conecte sua conta Google Ads nas configurações para visualizar
-            métricas de campanhas.
+            Conecte sua conta Google Ads nas configuracoes para visualizar
+            metricas de campanhas.
           </p>
           <Link
             href="/settings"
             className="inline-flex items-center gap-2 bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors"
           >
-            Ir para Configurações
+            Ir para Configuracoes
           </Link>
         </div>
       </div>
@@ -150,7 +165,7 @@ export default function GoogleAdsPage() {
               href="/settings"
               className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-lg font-medium transition-colors"
             >
-              Configurações
+              Configuracoes
             </Link>
           </div>
         </div>
@@ -166,7 +181,7 @@ export default function GoogleAdsPage() {
 
   const kpis = [
     {
-      label: "Impressões",
+      label: "Impressoes",
       value: summary?.impressions.toLocaleString("pt-BR") ?? "0",
       icon: Eye,
       color: "text-accent",
@@ -193,14 +208,29 @@ export default function GoogleAdsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Google Ads</h1>
+        {mounted && (connectedAt || lastSyncAt) && (
+          <div className="flex items-center gap-4 text-xs text-white/40">
+            {connectedAt && (
+              <span>Conectado em {formatTimestamp(connectedAt)}</span>
+            )}
+            {lastSyncAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Ultima sincronizacao: {formatTimestamp(lastSyncAt)}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Warning banner for partial errors */}
       {error && (summary || campaigns.length > 0) && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-yellow-200 text-sm font-medium">Atenção</p>
+            <p className="text-yellow-200 text-sm font-medium">Atencao</p>
             <p className="text-yellow-200/70 text-sm">{error}</p>
           </div>
         </div>
@@ -226,9 +256,9 @@ export default function GoogleAdsPage() {
           <div>
             <p className="text-white/80 text-sm font-medium">Campanhas sem dados</p>
             <p className="text-white/50 text-sm">
-              Suas campanhas foram encontradas, mas nenhuma gerou impressões nos
-              últimos 30 dias. Verifique no Google Ads se a configuração está
-              completa: anúncios aprovados, palavras-chave, orçamento definido e
+              Suas campanhas foram encontradas, mas nenhuma gerou impressoes nos
+              ultimos 30 dias. Verifique no Google Ads se a configuracao esta
+              completa: anuncios aprovados, palavras-chave, orcamento definido e
               faturamento ativo.
             </p>
           </div>
@@ -244,7 +274,7 @@ export default function GoogleAdsPage() {
               <tr className="border-b border-white/10 text-white/60">
                 <th className="text-left p-4">Campanha</th>
                 <th className="text-center p-4">Status</th>
-                <th className="text-right p-4">Impressões</th>
+                <th className="text-right p-4">Impressoes</th>
                 <th className="text-right p-4">Cliques</th>
                 <th className="text-right p-4">CTR</th>
                 <th className="text-right p-4">CPC</th>
@@ -291,10 +321,10 @@ export default function GoogleAdsPage() {
               {campaigns.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-white/40">
-                    <p>Nenhuma campanha encontrada nos últimos 30 dias.</p>
+                    <p>Nenhuma campanha encontrada nos ultimos 30 dias.</p>
                     <p className="text-xs mt-1">
-                      Se você criou campanhas recentemente, verifique se estão
-                      ativas e com configuração completa (anúncios, palavras-chave
+                      Se voce criou campanhas recentemente, verifique se estao
+                      ativas e com configuracao completa (anuncios, palavras-chave
                       e faturamento) no Google Ads.
                     </p>
                   </td>

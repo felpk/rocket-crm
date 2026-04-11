@@ -279,6 +279,11 @@ export async function getCampaignMetrics(
   accessToken: string,
   dateRange = "LAST_30_DAYS"
 ) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    log.info("Modo demo ativo — retornando campanhas fictícias");
+    return getDemoCampaigns();
+  }
+
   const query = `
     SELECT
       campaign.name,
@@ -315,7 +320,7 @@ export async function getCampaignMetrics(
       impressions: parseInt(r.metrics.impressions || "0"),
       clicks: parseInt(r.metrics.clicks || "0"),
       ctr: r.metrics.ctr || 0,
-      cpc: (r.metrics.averageCpc || 0) / 1_000_000,
+      cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
       spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
     })
   );
@@ -326,6 +331,11 @@ export async function getAccountSummary(
   accessToken: string,
   dateRange = "LAST_30_DAYS"
 ) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    log.info("Modo demo ativo — retornando summary fictício");
+    return getDemoSummary();
+  }
+
   const query = `
     SELECT
       metrics.impressions,
@@ -363,5 +373,71 @@ export async function getAccountSummary(
     ctr: impressions > 0 ? clicks / impressions : 0,
     cpc: clicks > 0 ? costMicros / 1_000_000 / clicks : 0,
     spend: costMicros / 1_000_000,
+  };
+}
+
+// --- Demo mode ---
+
+function getDemoCampaigns() {
+  return [
+    {
+      name: "Dr. Thiago Dantas [Pesquisa] [Implante] +45",
+      status: "ENABLED",
+      impressions: 18420,
+      clicks: 1253,
+      ctr: 0.068,
+      cpc: 2.87,
+      spend: 3596.11,
+    },
+    {
+      name: "Implantes Fortaleza",
+      status: "ENABLED",
+      impressions: 12350,
+      clicks: 876,
+      ctr: 0.0709,
+      cpc: 3.12,
+      spend: 2733.12,
+    },
+    {
+      name: "Clínica Sorriso — Lentes de Contato",
+      status: "ENABLED",
+      impressions: 9870,
+      clicks: 542,
+      ctr: 0.0549,
+      cpc: 4.15,
+      spend: 2249.30,
+    },
+    {
+      name: "Curso de Violão 3.0",
+      status: "PAUSED",
+      impressions: 3210,
+      clicks: 198,
+      ctr: 0.0617,
+      cpc: 1.45,
+      spend: 287.10,
+    },
+    {
+      name: "Kickboxing em casa | Guia",
+      status: "PAUSED",
+      impressions: 1540,
+      clicks: 87,
+      ctr: 0.0565,
+      cpc: 0.92,
+      spend: 80.04,
+    },
+  ];
+}
+
+function getDemoSummary() {
+  const campaigns = getDemoCampaigns();
+  const impressions = campaigns.reduce((s, c) => s + c.impressions, 0);
+  const clicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+  const spend = campaigns.reduce((s, c) => s + c.spend, 0);
+  return {
+    impressions,
+    clicks,
+    ctr: impressions > 0 ? clicks / impressions : 0,
+    cpc: clicks > 0 ? spend / clicks : 0,
+    spend,
   };
 }

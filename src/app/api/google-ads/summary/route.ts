@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import {
   getValidToken,
   getAccountSummary,
@@ -16,10 +17,17 @@ export async function GET(req: Request) {
   try {
     session = await requireAuth();
   } catch {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
+    return Response.json({ error: "Nao autorizado" }, { status: 401 });
   }
 
   try {
+    // Demo mode — return demo data without DB/API calls
+    if (process.env.GOOGLE_ADS_DEMO === "true") {
+      log.info("Modo demo ativo — retornando summary demo");
+      const summary = await getAccountSummary("demo", "demo");
+      return Response.json(summary);
+    }
+
     const url = new URL(req.url);
     const targetUserId = url.searchParams.get("userId");
 
@@ -28,33 +36,41 @@ export async function GET(req: Request) {
 
     const token = await getValidToken(userId);
     if (!token) {
-      log.warn("Google Ads não conectado", { userId });
+      log.warn("Google Ads nao conectado", { userId });
       return Response.json(
-        { error: "Google Ads não conectado" },
+        { error: "Google Ads nao conectado" },
         { status: 404 }
       );
     }
+
+    const syncNow = () =>
+      prisma.googleAdsConnection.update({
+        where: { userId },
+        data: { lastSyncAt: new Date() },
+      });
 
     try {
       const summary = await getAccountSummary(
         token.customerId,
         token.accessToken
       );
+      await syncNow();
       log.info("Summary carregado", summary);
       return Response.json(summary);
     } catch (apiError) {
       const errStr = String(apiError);
       if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
-        log.warn("Token inválido, tentando renovar", { userId });
+        log.warn("Token invalido, tentando renovar", { userId });
         const result = await refreshAndRetry(userId, (newToken) =>
           getAccountSummary(token.customerId, newToken)
         );
         if (result) {
-          log.info("Summary carregado após renovação", result);
+          await syncNow();
+          log.info("Summary carregado apos renovacao", result);
           return Response.json(result);
         }
         return Response.json(
-          { error: "Google Ads desconectado. Token expirado — reconecte nas configurações." },
+          { error: "Google Ads desconectado. Token expirado - reconecte nas configuracoes." },
           { status: 401 }
         );
       }
@@ -62,7 +78,7 @@ export async function GET(req: Request) {
     }
   } catch (error) {
     const details = String(error);
-    log.error("Falha ao buscar métricas", { error: details });
+    log.error("Falha ao buscar metricas", { error: details });
 
     const userMessage = parseGoogleAdsError(details);
     return Response.json({ error: userMessage, details }, { status: 500 });
