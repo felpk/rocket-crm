@@ -35,9 +35,12 @@ export async function GET() {
 
     return Response.json(state);
   } catch (error) {
-    log.error("Falha ao verificar conexão WhatsApp", { error: String(error) });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (msg === "Forbidden") return Response.json({ error: "Forbidden" }, { status: 403 });
+    log.error("Falha ao verificar conexão WhatsApp", { error: msg });
     return Response.json(
-      { error: "Falha ao verificar conexão", details: String(error) },
+      { error: "Falha ao verificar conexão", details: msg },
       { status: 500 }
     );
   }

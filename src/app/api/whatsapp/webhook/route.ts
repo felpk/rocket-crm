@@ -70,6 +70,13 @@ export async function POST(req: Request) {
         },
       });
       log.info("Lead criado via WhatsApp", { leadId: lead.id, name: pushName, phone });
+    } else if (pushName && pushName !== "Desconhecido" && pushName !== phone && lead.name === phone) {
+      // Update lead name if we now have a real pushName
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { name: pushName },
+      });
+      lead = { ...lead, name: pushName };
     }
 
     // Deduplication: check if identical message exists in last 5 seconds

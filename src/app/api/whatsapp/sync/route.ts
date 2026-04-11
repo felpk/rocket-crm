@@ -47,10 +47,18 @@ export async function POST(req: Request) {
 
     const result = await fetchMessages(connection.instanceName, phone);
 
-    // result pode ser array direto ou { messages: [...] }
-    const rawMessages: Array<Record<string, unknown>> = Array.isArray(result)
-      ? result
-      : result?.messages ?? result?.data ?? [];
+    // Evolution API v2 returns paginated: { messages: { records: [...] } }
+    // or older format: array or { messages: [...] }
+    let rawMessages: Array<Record<string, unknown>> = [];
+    if (Array.isArray(result)) {
+      rawMessages = result;
+    } else if (result?.messages?.records && Array.isArray(result.messages.records)) {
+      rawMessages = result.messages.records;
+    } else if (Array.isArray(result?.messages)) {
+      rawMessages = result.messages;
+    } else if (Array.isArray(result?.data)) {
+      rawMessages = result.data;
+    }
 
     log.info("Mensagens recebidas da Evolution API", { count: rawMessages.length });
 
@@ -116,9 +124,12 @@ export async function POST(req: Request) {
     log.info("Sincronização concluída", { leadId, total: rawMessages.length, synced });
     return Response.json({ total: rawMessages.length, synced });
   } catch (error) {
-    log.error("Falha ao sincronizar mensagens", { error: String(error) });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (msg === "Forbidden") return Response.json({ error: "Forbidden" }, { status: 403 });
+    log.error("Falha ao sincronizar mensagens", { error: msg });
     return Response.json(
-      { error: "Falha ao sincronizar mensagens", details: String(error) },
+      { error: "Falha ao sincronizar mensagens", details: msg },
       { status: 500 }
     );
   }

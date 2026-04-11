@@ -36,9 +36,12 @@ export async function GET(req: Request) {
     log.info("Mensagens carregadas", { leadId, count: messages.length });
     return Response.json({ lead, messages });
   } catch (error) {
-    log.error("Falha ao buscar mensagens", { error: String(error) });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg === "Unauthorized") return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (msg === "Forbidden") return Response.json({ error: "Forbidden" }, { status: 403 });
+    log.error("Falha ao buscar mensagens", { error: msg });
     return Response.json(
-      { error: "Falha ao buscar mensagens", details: String(error) },
+      { error: "Falha ao buscar mensagens", details: msg },
       { status: 500 }
     );
   }
