@@ -145,15 +145,86 @@ export default function GoogleAdsPage() {
     );
   }
 
-  // If error and no data at all, show full-page error
+  // If error and no data at all, show full-page error with actionable guidance
   if (error && !summary && campaigns.length === 0) {
+    // Detect specific error types for targeted guidance
+    const lowerError = error.toLowerCase();
+    const isAccountNotEnabled =
+      lowerError.includes("não está ativada") ||
+      lowerError.includes("nao esta ativada") ||
+      lowerError.includes("not yet enabled") ||
+      lowerError.includes("customer_not_enabled") ||
+      lowerError.includes("completou a configuração") ||
+      lowerError.includes("completou a configuracao");
+    const isMccMismatch =
+      lowerError.includes("mcc") ||
+      lowerError.includes("developer token") ||
+      lowerError.includes("nao pertence");
+    const isPermission =
+      !isAccountNotEnabled &&
+      (lowerError.includes("permissao") ||
+       lowerError.includes("permission") ||
+       lowerError.includes("403"));
+    const isTokenError =
+      lowerError.includes("token") ||
+      lowerError.includes("401") ||
+      lowerError.includes("expirado") ||
+      lowerError.includes("revogado");
+
     return (
       <div>
         <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
         <div className="bg-card rounded-xl p-12 text-center">
           <BarChart3 className="w-12 h-12 text-red-400 mx-auto mb-4 opacity-50" />
-          <h2 className="text-lg font-semibold mb-2">Erro ao carregar dados</h2>
-          <p className="text-white/70 text-sm mb-6 max-w-lg mx-auto">{error}</p>
+          <h2 className="text-lg font-semibold mb-2">
+            {isAccountNotEnabled
+              ? "Conta Google Ads nao ativada"
+              : isMccMismatch
+              ? "Conta nao vinculada ao MCC"
+              : isPermission
+              ? "Sem permissao de acesso"
+              : isTokenError
+              ? "Problema de autenticacao"
+              : "Erro ao carregar dados"}
+          </h2>
+          <p className="text-white/70 text-sm mb-4 max-w-lg mx-auto">{error}</p>
+
+          {/* Account not enabled — most common issue */}
+          {isAccountNotEnabled && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6 max-w-lg mx-auto text-left">
+              <p className="text-yellow-200/80 text-sm font-medium mb-2">O que fazer:</p>
+              <ol className="text-yellow-200/60 text-sm space-y-1 list-decimal list-inside">
+                <li>Acesse <span className="text-yellow-200/80 font-medium">ads.google.com</span> com a mesma conta Google conectada</li>
+                <li>Aceite os Termos de Servico do Google Ads</li>
+                <li>Configure um metodo de pagamento (faturamento)</li>
+                <li>Aguarde a ativacao da conta (pode levar alguns minutos)</li>
+                <li>Volte aqui, desconecte e reconecte nas Configuracoes</li>
+              </ol>
+            </div>
+          )}
+
+          {/* MCC mismatch / permission errors */}
+          {(isMccMismatch || isPermission) && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6 max-w-lg mx-auto text-left">
+              <p className="text-yellow-200/80 text-sm font-medium mb-2">O que fazer:</p>
+              <ol className="text-yellow-200/60 text-sm space-y-1 list-decimal list-inside">
+                <li>Desconecte a conta atual em Configuracoes</li>
+                <li>No Google Ads, vincule esta conta ao MCC do developer token</li>
+                <li>Reconecte usando a conta Google com acesso ao MCC</li>
+              </ol>
+            </div>
+          )}
+
+          {isTokenError && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6 max-w-lg mx-auto text-left">
+              <p className="text-yellow-200/80 text-sm font-medium mb-2">O que fazer:</p>
+              <ol className="text-yellow-200/60 text-sm space-y-1 list-decimal list-inside">
+                <li>Va em Configuracoes e desconecte sua conta</li>
+                <li>Reconecte sua conta Google Ads</li>
+              </ol>
+            </div>
+          )}
+
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={checkAndLoad}

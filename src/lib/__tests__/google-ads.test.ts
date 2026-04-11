@@ -38,55 +38,86 @@ import { parseGoogleAdsError } from "@/lib/google-ads";
 
 describe("parseGoogleAdsError", () => {
   it("retorna mensagem para NOT_ADS_USER", () => {
-    const msg = parseGoogleAdsError("Error: NOT_ADS_USER - this account is not an ads user");
-    expect(msg).toContain("conta Google Ads associada");
+    const result = parseGoogleAdsError("Error: NOT_ADS_USER - this account is not an ads user");
+    expect(result.message).toContain("conta Google Ads associada");
+    expect(result.code).toBe("google-ads-not-ads-user");
   });
 
   it("retorna mensagem para CUSTOMER_NOT_ENABLED", () => {
-    const msg = parseGoogleAdsError("CUSTOMER_NOT_ENABLED: account is not enabled");
-    expect(msg).toContain("ativada");
+    const result = parseGoogleAdsError("CUSTOMER_NOT_ENABLED: account is not enabled");
+    expect(result.message).toContain("ativada");
+    expect(result.code).toBe("google-ads-account-not-enabled");
   });
 
   it("retorna mensagem para conta suspensa", () => {
-    const msg = parseGoogleAdsError("Error: account NOT_ACTIVE, suspended");
-    expect(msg).toContain("suspensa ou cancelada");
+    const result = parseGoogleAdsError("Error: account NOT_ACTIVE, suspended");
+    expect(result.message).toContain("suspensa ou cancelada");
+    expect(result.code).toBe("google-ads-account-suspended");
   });
 
   it("retorna mensagem para billing/payment", () => {
-    const msg = parseGoogleAdsError("billing setup required for this account");
-    expect(msg).toContain("faturamento");
+    const result = parseGoogleAdsError("billing setup required for this account");
+    expect(result.message).toContain("faturamento");
   });
 
   it("retorna mensagem para permission denied", () => {
-    const msg = parseGoogleAdsError("ACCESS_DENIED: permission denied for this resource");
-    expect(msg).toContain("permiss");
+    const result = parseGoogleAdsError("ACCESS_DENIED: permission denied for this resource");
+    expect(result.message).toContain("permiss");
+    expect(result.code).toBe("google-ads-permission-denied");
   });
 
   it("retorna mensagem para developer token", () => {
-    const msg = parseGoogleAdsError("invalid developer_token provided");
-    expect(msg).toContain("developer token");
+    const result = parseGoogleAdsError("invalid developer_token provided");
+    expect(result.message).toContain("developer token");
+    expect(result.code).toBe("google-ads-developer-token");
   });
 
   it("retorna mensagem para rate limit", () => {
-    const msg = parseGoogleAdsError("RATE_LIMIT_EXCEEDED: quota exhausted");
-    expect(msg).toContain("Limite de requisi");
+    const result = parseGoogleAdsError("RATE_LIMIT_EXCEEDED: quota exhausted");
+    expect(result.message).toContain("Limite de requisi");
+    expect(result.code).toBe("google-ads-rate-limit");
   });
 
   it("retorna mensagem para invalid customer id", () => {
-    const msg = parseGoogleAdsError("INVALID_CUSTOMER_ID: bad id format");
-    expect(msg).toContain("inv");
+    const result = parseGoogleAdsError("INVALID_CUSTOMER_ID: bad id format");
+    expect(result.message).toContain("inv");
+    expect(result.code).toBe("google-ads-invalid-customer-id");
   });
 
   it("trunca mensagens longas no fallback", () => {
     const longError = "Error: " + "x".repeat(300);
-    const msg = parseGoogleAdsError(longError);
-    expect(msg.length).toBeLessThanOrEqual(203); // 200 + "..."
+    const result = parseGoogleAdsError(longError);
+    expect(result.message.length).toBeLessThanOrEqual(203); // 200 + "..."
+    expect(result.code).toBe("google-ads-unknown");
   });
 
   it("limpa prefixos Error: e Google Ads API:", () => {
-    const msg = parseGoogleAdsError("Google Ads API: something unknown happened");
-    expect(msg).not.toContain("Google Ads API:");
-    expect(msg).toContain("something unknown happened");
+    const result = parseGoogleAdsError("Google Ads API: something unknown happened");
+    expect(result.message).not.toContain("Google Ads API:");
+    expect(result.message).toContain("something unknown happened");
+  });
+
+  it("detecta permissao negada generica em erro 403 com 'the caller does not have permission'", () => {
+    const result = parseGoogleAdsError("403 - The caller does not have permission");
+    expect(result.code).toBe("google-ads-permission-denied");
+    expect(result.message).toContain("ads.google.com");
+  });
+
+  it("detecta MCC mismatch quando erro menciona developer token", () => {
+    const result = parseGoogleAdsError("403 - developer token is not authorized to access this account");
+    expect(result.code).toBe("google-ads-mcc-mismatch");
+    expect(result.message).toContain("MCC");
+  });
+
+  it("detecta CUSTOMER_NOT_ENABLED antes de 403 generico", () => {
+    const result = parseGoogleAdsError("403 - CUSTOMER_NOT_ENABLED: The customer account can't be accessed because it is not yet enabled");
+    expect(result.code).toBe("google-ads-account-not-enabled");
+    expect(result.message).toContain("ads.google.com");
+  });
+
+  it("detecta token revogado", () => {
+    const result = parseGoogleAdsError("Token has been expired or revoked");
+    expect(result.code).toBe("google-ads-token-revoked");
   });
 });
 

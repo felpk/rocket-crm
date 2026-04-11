@@ -52,7 +52,9 @@ export async function GET(req: Request) {
     try {
       const summary = await getAccountSummary(
         token.customerId,
-        token.accessToken
+        token.accessToken,
+        "ALL_TIME",
+        token.loginCustomerId
       );
       await syncNow();
       log.info("Summary carregado", summary);
@@ -62,7 +64,7 @@ export async function GET(req: Request) {
       if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
         log.warn("Token invalido, tentando renovar", { userId });
         const result = await refreshAndRetry(userId, (newToken) =>
-          getAccountSummary(token.customerId, newToken)
+          getAccountSummary(token.customerId, newToken, "ALL_TIME", token.loginCustomerId)
         );
         if (result) {
           await syncNow();
@@ -80,7 +82,8 @@ export async function GET(req: Request) {
     const details = String(error);
     log.error("Falha ao buscar metricas", { error: details });
 
-    const userMessage = parseGoogleAdsError(details);
-    return Response.json({ error: userMessage, details }, { status: 500 });
+    const parsed = parseGoogleAdsError(details);
+    log.error("Erro parseado para o usuario", { errorCode: parsed.code, errorMessage: parsed.message });
+    return Response.json({ error: parsed.message, errorCode: parsed.code, details }, { status: 500 });
   }
 }

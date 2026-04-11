@@ -91,18 +91,19 @@ model WhatsappConnection {
 }
 
 model GoogleAdsConnection {
-  id            String   @id @default(cuid())
-  customerId    String
-  accessToken   String
-  refreshToken  String
-  tokenExpiry   DateTime
-  accountName   String?
-  lastSyncAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  customerId      String
+  loginCustomerId String?  // MCC ID when accessing through a manager account
+  accessToken     String
+  refreshToken    String
+  tokenExpiry     DateTime
+  accountName     String?
+  lastSyncAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
