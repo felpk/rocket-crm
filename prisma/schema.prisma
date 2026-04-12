@@ -98,6 +98,7 @@ model GoogleAdsConnection {
   refreshToken    String
   tokenExpiry     DateTime
   accountName     String?
+  managedAccounts String?  // JSON: [{ id, name }] — cached MCC client accounts
   lastSyncAt      DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

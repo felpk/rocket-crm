@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { createLogger } from "./logger";
+import * as demo from "./google-ads-demo";
 
 const log = createLogger("google-ads");
 
@@ -573,15 +574,41 @@ export async function listAccessibleAccounts(accessToken: string) {
   return ids;
 }
 
+// --- Date range utility ---
+
+const VALID_DATE_RANGES = [
+  "LAST_7_DAYS",
+  "LAST_30_DAYS",
+  "THIS_MONTH",
+  "LAST_MONTH",
+  "LAST_90_DAYS",
+  "ALL_TIME",
+] as const;
+
+export type DateRange = (typeof VALID_DATE_RANGES)[number];
+
+export function parseDateRange(range?: string | null): DateRange {
+  if (!range) return "ALL_TIME";
+  const upper = range.toUpperCase();
+  if (VALID_DATE_RANGES.includes(upper as DateRange)) return upper as DateRange;
+  return "ALL_TIME";
+}
+
+function dateWhereClause(dateRange: DateRange, prefix = "WHERE"): string {
+  return dateRange !== "ALL_TIME" ? `${prefix} segments.date DURING ${dateRange}` : "";
+}
+
+// --- Data functions ---
+
 export async function getCampaignMetrics(
   customerId: string,
   accessToken: string,
-  dateRange = "ALL_TIME",
+  dateRange: DateRange = "ALL_TIME",
   loginCustomerId?: string | null
 ) {
   if (process.env.GOOGLE_ADS_DEMO === "true") {
     log.info("Modo demo ativo — retornando campanhas fictícias");
-    return getDemoCampaigns();
+    return demo.getDemoCampaigns();
   }
 
   const query = `
@@ -592,9 +619,13 @@ export async function getCampaignMetrics(
       metrics.clicks,
       metrics.ctr,
       metrics.average_cpc,
-      metrics.cost_micros
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value,
+      metrics.cost_per_conversion,
+      metrics.search_impression_share
     FROM campaign
-    ${dateRange !== "ALL_TIME" ? `WHERE segments.date DURING ${dateRange}` : ""}
+    ${dateWhereClause(dateRange)}
     ORDER BY metrics.impressions DESC
   `;
 
@@ -603,38 +634,31 @@ export async function getCampaignMetrics(
     body: JSON.stringify({ query }),
   }, loginCustomerId || undefined);
 
-  const results = data.results || [];
-  return results.map(
-    (r: {
-      campaign: { name: string; status: string };
-      metrics: {
-        impressions: string;
-        clicks: string;
-        ctr: number;
-        averageCpc: string;
-        costMicros: string;
-      };
-    }) => ({
-      name: r.campaign.name,
-      status: r.campaign.status,
-      impressions: parseInt(r.metrics.impressions || "0"),
-      clicks: parseInt(r.metrics.clicks || "0"),
-      ctr: r.metrics.ctr || 0,
-      cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
-      spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
-    })
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    name: r.campaign.name,
+    status: r.campaign.status,
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+    conversionsValue: parseFloat(r.metrics.conversionsValue || "0"),
+    costPerConversion: parseFloat(r.metrics.costPerConversion || "0") / 1_000_000,
+    searchImpressionShare: parseFloat(r.metrics.searchImpressionShare || "0"),
+  }));
 }
 
 export async function getAccountSummary(
   customerId: string,
   accessToken: string,
-  dateRange = "ALL_TIME",
+  dateRange: DateRange = "ALL_TIME",
   loginCustomerId?: string | null
 ) {
   if (process.env.GOOGLE_ADS_DEMO === "true") {
     log.info("Modo demo ativo — retornando summary fictício");
-    return getDemoSummary();
+    return demo.getDemoSummary();
   }
 
   const query = `
@@ -643,9 +667,12 @@ export async function getAccountSummary(
       metrics.clicks,
       metrics.ctr,
       metrics.average_cpc,
-      metrics.cost_micros
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value,
+      metrics.cost_per_conversion
     FROM customer
-    ${dateRange !== "ALL_TIME" ? `WHERE segments.date DURING ${dateRange}` : ""}
+    ${dateWhereClause(dateRange)}
   `;
 
   const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
@@ -655,17 +682,17 @@ export async function getAccountSummary(
 
   const results = data.results || [];
   if (results.length === 0) {
-    return { impressions: 0, clicks: 0, ctr: 0, cpc: 0, spend: 0 };
+    return { impressions: 0, clicks: 0, ctr: 0, cpc: 0, spend: 0, conversions: 0, conversionsValue: 0, costPerConversion: 0 };
   }
 
-  let impressions = 0,
-    clicks = 0,
-    costMicros = 0;
+  let impressions = 0, clicks = 0, costMicros = 0, conversions = 0, conversionsValue = 0;
 
   for (const r of results) {
     impressions += parseInt(r.metrics.impressions || "0");
     clicks += parseInt(r.metrics.clicks || "0");
     costMicros += parseInt(r.metrics.costMicros || "0");
+    conversions += parseFloat(r.metrics.conversions || "0");
+    conversionsValue += parseFloat(r.metrics.conversionsValue || "0");
   }
 
   return {
@@ -674,7 +701,515 @@ export async function getAccountSummary(
     ctr: impressions > 0 ? clicks / impressions : 0,
     cpc: clicks > 0 ? costMicros / 1_000_000 / clicks : 0,
     spend: costMicros / 1_000_000,
+    conversions,
+    conversionsValue,
+    costPerConversion: conversions > 0 ? costMicros / 1_000_000 / conversions : 0,
   };
+}
+
+// --- Ad Groups ---
+
+export async function getAdGroupMetrics(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoAdGroups();
+  }
+
+  const dateClause = dateRange !== "ALL_TIME" ? `AND segments.date DURING ${dateRange}` : "";
+  const query = `
+    SELECT
+      campaign.name, campaign.id,
+      ad_group.name, ad_group.status, ad_group.id,
+      ad_group.cpc_bid_micros,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.average_cpc, metrics.cost_micros,
+      metrics.conversions, metrics.conversions_value
+    FROM ad_group
+    WHERE campaign.status != 'REMOVED' ${dateClause}
+    ORDER BY metrics.impressions DESC
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    campaignName: r.campaign.name,
+    campaignId: r.campaign.id,
+    name: r.adGroup.name,
+    id: r.adGroup.id,
+    status: r.adGroup.status,
+    cpcBid: parseInt(r.adGroup.cpcBidMicros || "0") / 1_000_000,
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+    conversionsValue: parseFloat(r.metrics.conversionsValue || "0"),
+  }));
+}
+
+// --- Keywords ---
+
+export async function getKeywordMetrics(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoKeywords();
+  }
+
+  const dateClause = dateRange !== "ALL_TIME" ? `AND segments.date DURING ${dateRange}` : "";
+  const query = `
+    SELECT
+      campaign.name,
+      ad_group.name,
+      ad_group_criterion.keyword.text,
+      ad_group_criterion.keyword.match_type,
+      ad_group_criterion.quality_info.quality_score,
+      ad_group_criterion.effective_cpc_bid_micros,
+      ad_group_criterion.status,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.average_cpc, metrics.cost_micros,
+      metrics.conversions
+    FROM keyword_view
+    WHERE ad_group_criterion.status != 'REMOVED' ${dateClause}
+    ORDER BY metrics.impressions DESC
+    LIMIT 200
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    campaignName: r.campaign.name,
+    adGroupName: r.adGroup.name,
+    text: r.adGroupCriterion?.keyword?.text || "",
+    matchType: r.adGroupCriterion?.keyword?.matchType || "",
+    qualityScore: r.adGroupCriterion?.qualityInfo?.qualityScore || 0,
+    bid: parseInt(r.adGroupCriterion?.effectiveCpcBidMicros || "0") / 1_000_000,
+    status: r.adGroupCriterion?.status || "",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+  }));
+}
+
+// --- Search Terms ---
+
+export async function getSearchTerms(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoSearchTerms();
+  }
+
+  const query = `
+    SELECT
+      search_term_view.search_term,
+      campaign.name,
+      ad_group.name,
+      search_term_view.status,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.cost_micros, metrics.conversions
+    FROM search_term_view
+    ${dateWhereClause(dateRange)}
+    ORDER BY metrics.impressions DESC
+    LIMIT 100
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    searchTerm: r.searchTermView?.searchTerm || "",
+    campaignName: r.campaign.name,
+    adGroupName: r.adGroup.name,
+    status: r.searchTermView?.status || "",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+  }));
+}
+
+// --- Device Breakdown ---
+
+export async function getDeviceBreakdown(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoDevices();
+  }
+
+  const query = `
+    SELECT
+      segments.device,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.average_cpc, metrics.cost_micros,
+      metrics.conversions, metrics.conversions_value
+    FROM customer
+    ${dateWhereClause(dateRange)}
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    device: r.segments?.device || "UNKNOWN",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    cpc: parseInt(r.metrics.averageCpc || "0") / 1_000_000,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+    conversionsValue: parseFloat(r.metrics.conversionsValue || "0"),
+  }));
+}
+
+// --- Demographics ---
+
+export async function getDemographics(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoDemographics();
+  }
+
+  const ageQuery = `
+    SELECT
+      ad_group_criterion.age_range.type,
+      metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+    FROM age_range_view
+    ${dateWhereClause(dateRange)}
+  `;
+
+  const genderQuery = `
+    SELECT
+      ad_group_criterion.gender.type,
+      metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+    FROM gender_view
+    ${dateWhereClause(dateRange)}
+  `;
+
+  const [ageData, genderData] = await Promise.all([
+    gadsFetch(customerId, accessToken, "/googleAds:search", {
+      method: "POST",
+      body: JSON.stringify({ query: ageQuery }),
+    }, loginCustomerId || undefined),
+    gadsFetch(customerId, accessToken, "/googleAds:search", {
+      method: "POST",
+      body: JSON.stringify({ query: genderQuery }),
+    }, loginCustomerId || undefined),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const age = (ageData.results || []).map((r: any) => ({
+    ageRange: r.adGroupCriterion?.ageRange?.type || "UNKNOWN",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gender = (genderData.results || []).map((r: any) => ({
+    gender: r.adGroupCriterion?.gender?.type || "UNKNOWN",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+  }));
+
+  return { age, gender };
+}
+
+// --- Location Performance ---
+
+export async function getLocationPerformance(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoLocations();
+  }
+
+  const query = `
+    SELECT
+      campaign_criterion.location.geo_target_constant,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.cost_micros, metrics.conversions
+    FROM user_location_view
+    ${dateWhereClause(dateRange)}
+    ORDER BY metrics.impressions DESC
+    LIMIT 50
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    location: r.campaignCriterion?.location?.geoTargetConstant || "Desconhecido",
+    locationType: "LOCATION",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    ctr: r.metrics.ctr || 0,
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+  }));
+}
+
+// --- Daily Performance ---
+
+export async function getDailyPerformance(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "LAST_30_DAYS",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoDaily();
+  }
+
+  const effectiveRange = dateRange === "ALL_TIME" ? "LAST_30_DAYS" : dateRange;
+  const query = `
+    SELECT
+      segments.date,
+      metrics.impressions, metrics.clicks, metrics.cost_micros,
+      metrics.conversions, metrics.conversions_value
+    FROM customer
+    WHERE segments.date DURING ${effectiveRange}
+    ORDER BY segments.date ASC
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    date: r.segments?.date || "",
+    impressions: parseInt(r.metrics.impressions || "0"),
+    clicks: parseInt(r.metrics.clicks || "0"),
+    spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+    conversions: parseFloat(r.metrics.conversions || "0"),
+    conversionsValue: parseFloat(r.metrics.conversionsValue || "0"),
+  }));
+}
+
+// --- Budget Utilization ---
+
+export async function getBudgetUtilization(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoBudgets();
+  }
+
+  const dateClause = dateRange !== "ALL_TIME" ? `AND segments.date DURING ${dateRange}` : "";
+  const query = `
+    SELECT
+      campaign.name, campaign.status,
+      campaign_budget.amount_micros,
+      metrics.cost_micros
+    FROM campaign
+    WHERE campaign.status != 'REMOVED' ${dateClause}
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => {
+    const dailyBudget = parseInt(r.campaignBudget?.amountMicros || "0") / 1_000_000;
+    const spend = parseInt(r.metrics.costMicros || "0") / 1_000_000;
+    return {
+      campaignName: r.campaign.name,
+      status: r.campaign.status,
+      dailyBudget,
+      spend,
+      utilization: dailyBudget > 0 ? spend / dailyBudget : 0,
+    };
+  });
+}
+
+// --- Change History ---
+
+export async function getChangeHistory(
+  customerId: string,
+  accessToken: string,
+  _dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoChangeHistory();
+  }
+
+  const query = `
+    SELECT
+      change_event.change_date_time,
+      change_event.change_resource_type,
+      change_event.resource_change_operation,
+      change_event.user_email
+    FROM change_event
+    WHERE change_event.change_date_time DURING LAST_14_DAYS
+    ORDER BY change_event.change_date_time DESC
+    LIMIT 50
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    date: r.changeEvent?.changeDateTime || "",
+    resourceType: r.changeEvent?.changeResourceType || "",
+    operation: r.changeEvent?.resourceChangeOperation || "",
+    userEmail: r.changeEvent?.userEmail || "",
+  }));
+}
+
+// --- Recommendations ---
+
+export async function getRecommendations(
+  customerId: string,
+  accessToken: string,
+  _dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoRecommendations();
+  }
+
+  const query = `
+    SELECT
+      recommendation.type,
+      recommendation.campaign,
+      recommendation.impact.base_metrics.impressions,
+      recommendation.impact.base_metrics.clicks,
+      recommendation.impact.base_metrics.cost_micros,
+      recommendation.impact.potential_metrics.impressions,
+      recommendation.impact.potential_metrics.clicks,
+      recommendation.impact.potential_metrics.cost_micros
+    FROM recommendation
+    LIMIT 30
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => ({
+    type: r.recommendation?.type || "",
+    campaign: r.recommendation?.campaign || "",
+    impactImpressions: parseInt(r.recommendation?.impact?.baseMetrics?.impressions || "0"),
+    impactClicks: parseInt(r.recommendation?.impact?.baseMetrics?.clicks || "0"),
+    impactCost: parseInt(r.recommendation?.impact?.baseMetrics?.costMicros || "0") / 1_000_000,
+    potentialImpressions: parseInt(r.recommendation?.impact?.potentialMetrics?.impressions || "0"),
+    potentialClicks: parseInt(r.recommendation?.impact?.potentialMetrics?.clicks || "0"),
+    potentialCost: parseInt(r.recommendation?.impact?.potentialMetrics?.costMicros || "0") / 1_000_000,
+  }));
+}
+
+// --- Ad Metrics ---
+
+export async function getAdMetrics(
+  customerId: string,
+  accessToken: string,
+  dateRange: DateRange = "ALL_TIME",
+  loginCustomerId?: string | null
+) {
+  if (process.env.GOOGLE_ADS_DEMO === "true") {
+    return demo.getDemoAds();
+  }
+
+  const dateClause = dateRange !== "ALL_TIME" ? `AND segments.date DURING ${dateRange}` : "";
+  const query = `
+    SELECT
+      campaign.name,
+      ad_group.name,
+      ad_group_ad.ad.responsive_search_ad.headlines,
+      ad_group_ad.ad.responsive_search_ad.descriptions,
+      ad_group_ad.ad.final_urls,
+      ad_group_ad.status,
+      ad_group_ad.policy_summary.approval_status,
+      metrics.impressions, metrics.clicks, metrics.ctr,
+      metrics.cost_micros, metrics.conversions
+    FROM ad_group_ad
+    WHERE ad_group_ad.status != 'REMOVED' ${dateClause}
+    ORDER BY metrics.impressions DESC
+    LIMIT 100
+  `;
+
+  const data = await gadsFetch(customerId, accessToken, "/googleAds:search", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, loginCustomerId || undefined);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data.results || []).map((r: any) => {
+    const rsa = r.adGroupAd?.ad?.responsiveSearchAd;
+    return {
+      campaignName: r.campaign.name,
+      adGroupName: r.adGroup.name,
+      headlines: (rsa?.headlines || []).map((h: { text: string }) => h.text),
+      descriptions: (rsa?.descriptions || []).map((d: { text: string }) => d.text),
+      finalUrls: r.adGroupAd?.ad?.finalUrls || [],
+      status: r.adGroupAd?.status || "",
+      approvalStatus: r.adGroupAd?.policySummary?.approvalStatus || "",
+      impressions: parseInt(r.metrics.impressions || "0"),
+      clicks: parseInt(r.metrics.clicks || "0"),
+      ctr: r.metrics.ctr || 0,
+      spend: parseInt(r.metrics.costMicros || "0") / 1_000_000,
+      conversions: parseFloat(r.metrics.conversions || "0"),
+    };
+  });
 }
 
 // --- Account validation ---
@@ -725,68 +1260,3 @@ export async function validateAccountAccess(
   }
 }
 
-// --- Demo mode ---
-
-function getDemoCampaigns() {
-  return [
-    {
-      name: "Dr. Thiago Dantas [Pesquisa] [Implante] +45",
-      status: "ENABLED",
-      impressions: 18420,
-      clicks: 1253,
-      ctr: 0.068,
-      cpc: 2.87,
-      spend: 3596.11,
-    },
-    {
-      name: "Implantes Fortaleza",
-      status: "ENABLED",
-      impressions: 12350,
-      clicks: 876,
-      ctr: 0.0709,
-      cpc: 3.12,
-      spend: 2733.12,
-    },
-    {
-      name: "Clínica Sorriso — Lentes de Contato",
-      status: "ENABLED",
-      impressions: 9870,
-      clicks: 542,
-      ctr: 0.0549,
-      cpc: 4.15,
-      spend: 2249.30,
-    },
-    {
-      name: "Curso de Violão 3.0",
-      status: "PAUSED",
-      impressions: 3210,
-      clicks: 198,
-      ctr: 0.0617,
-      cpc: 1.45,
-      spend: 287.10,
-    },
-    {
-      name: "Kickboxing em casa | Guia",
-      status: "PAUSED",
-      impressions: 1540,
-      clicks: 87,
-      ctr: 0.0565,
-      cpc: 0.92,
-      spend: 80.04,
-    },
-  ];
-}
-
-function getDemoSummary() {
-  const campaigns = getDemoCampaigns();
-  const impressions = campaigns.reduce((s, c) => s + c.impressions, 0);
-  const clicks = campaigns.reduce((s, c) => s + c.clicks, 0);
-  const spend = campaigns.reduce((s, c) => s + c.spend, 0);
-  return {
-    impressions,
-    clicks,
-    ctr: impressions > 0 ? clicks / impressions : 0,
-    cpc: clicks > 0 ? spend / clicks : 0,
-    spend,
-  };
-}

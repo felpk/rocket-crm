@@ -17,12 +17,13 @@ export async function GET() {
         accountName: "Conta Demo",
         lastSyncAt: new Date().toISOString(),
         connectedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        hasManagedAccounts: true,
       });
     }
 
     const connection = await prisma.googleAdsConnection.findUnique({
       where: { userId: session.id },
-      select: { customerId: true, accountName: true, lastSyncAt: true, createdAt: true },
+      select: { customerId: true, accountName: true, managedAccounts: true, lastSyncAt: true, createdAt: true },
     });
 
     if (!connection) {
@@ -37,6 +38,7 @@ export async function GET() {
       accountName: connection.accountName,
       lastSyncAt: connection.lastSyncAt,
       connectedAt: connection.createdAt,
+      hasManagedAccounts: !!connection.managedAccounts,
     });
   } catch (err) {
     log.error("Erro ao verificar status Google Ads", { error: String(err) });

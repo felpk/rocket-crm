@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
     // Detect if the first account is an MCC (manager account)
     let customerId = accounts[0];
     let loginCustomerId: string | null = null;
+    let managedAccountsJson: string | null = null;
 
     const isMcc = await isManagerAccount(customerId, tokens.access_token);
     if (isMcc) {
@@ -69,12 +70,18 @@ export async function GET(req: NextRequest) {
         redirect("/settings?error=google-ads-no-client-accounts");
       }
 
+      // Cache the full list of managed accounts for account switching
+      managedAccountsJson = JSON.stringify(
+        clientAccounts.map((a) => ({ id: a.id, name: a.name }))
+      );
+
       loginCustomerId = customerId; // MCC ID for the login-customer-id header
       customerId = clientAccounts[0].id; // Use the first client account
       log.info("Usando conta cliente do MCC", {
         mccId: loginCustomerId,
         clientId: customerId,
         clientName: clientAccounts[0].name,
+        totalAccounts: clientAccounts.length,
       });
     }
 
@@ -112,6 +119,7 @@ export async function GET(req: NextRequest) {
         userId,
         customerId,
         loginCustomerId,
+        managedAccounts: managedAccountsJson,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         tokenExpiry,
@@ -119,6 +127,7 @@ export async function GET(req: NextRequest) {
       update: {
         customerId,
         loginCustomerId,
+        managedAccounts: managedAccountsJson,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         tokenExpiry,

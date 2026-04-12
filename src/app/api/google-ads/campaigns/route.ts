@@ -5,6 +5,7 @@ import {
   getCampaignMetrics,
   parseGoogleAdsError,
   refreshAndRetry,
+  parseDateRange,
 } from "@/lib/google-ads";
 import { createLogger } from "@/lib/logger";
 
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const targetUserId = url.searchParams.get("userId");
+    const dateRange = parseDateRange(url.searchParams.get("dateRange"));
 
     const userId =
       session.role === "admin" && targetUserId ? targetUserId : session.id;
@@ -54,7 +56,7 @@ export async function GET(req: Request) {
       const campaigns = await getCampaignMetrics(
         token.customerId,
         token.accessToken,
-        "ALL_TIME",
+        dateRange,
         token.loginCustomerId
       );
       await syncNow();
@@ -65,7 +67,7 @@ export async function GET(req: Request) {
       if (errStr.includes("401") || errStr.includes("UNAUTHENTICATED")) {
         log.warn("Token invalido, tentando renovar", { userId });
         const result = await refreshAndRetry(userId, (newToken) =>
-          getCampaignMetrics(token.customerId, newToken, "ALL_TIME", token.loginCustomerId)
+          getCampaignMetrics(token.customerId, newToken, dateRange, token.loginCustomerId)
         );
         if (result) {
           await syncNow();
