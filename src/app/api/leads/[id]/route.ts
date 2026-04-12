@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
+import { runAutomations } from "@/lib/automations/engine";
+import type { StageChangeTriggerConfig } from "@/lib/automations/types";
 
 const log = createLogger("leads/[id]");
 
@@ -40,6 +42,21 @@ export async function PATCH(
     });
 
     log.info("Lead atualizado", { id, stage: updated.stage });
+
+    // Fire stage_change automations if stage changed
+    if (data.stage !== undefined && data.stage !== lead.stage) {
+      await Promise.race([
+        runAutomations("stage_change", lead.userId, {
+          lead: { id: updated.id, name: updated.name, email: updated.email, phone: updated.phone, company: updated.company, stage: updated.stage },
+          userId: lead.userId,
+        }, (triggerConfig) => {
+          const cfg = triggerConfig as StageChangeTriggerConfig;
+          return cfg.toStage === data.stage && (!cfg.fromStage || cfg.fromStage === lead.stage);
+        }),
+        new Promise(resolve => setTimeout(resolve, 5000)),
+      ]).catch(err => log.error("Automação stage_change falhou", { error: String(err) }));
+    }
+
     return Response.json(updated);
   } catch (err) {
     log.error("Erro ao atualizar lead", { id, error: String(err) });

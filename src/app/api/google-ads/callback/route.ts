@@ -2,7 +2,14 @@ import { NextRequest } from "next/server";
 import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/db";
-import { exchangeCodeForTokens, listAccessibleAccounts } from "@/lib/google-ads";
+import {
+  exchangeCodeForTokens,
+  listAccessibleAccounts,
+  isManagerAccount,
+  listManagedAccounts,
+  validateAccountAccess,
+  GADS_ERROR_CODES,
+} from "@/lib/google-ads";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("google-ads/callback");
@@ -43,7 +50,67 @@ export async function GET(req: NextRequest) {
       redirect("/settings?error=google-ads-no-accounts");
     }
 
-    const customerId = accounts[0];
+    // Detect if the first account is an MCC (manager account)
+    let customerId = accounts[0];
+    let loginCustomerId: string | null = null;
+    let managedAccountsJson: string | null = null;
+
+    const isMcc = await isManagerAccount(customerId, tokens.access_token);
+    if (isMcc) {
+      log.info("Conta é MCC, buscando contas gerenciadas", { mccId: customerId });
+      const managed = await listManagedAccounts(customerId, tokens.access_token);
+      const clientAccounts = managed.filter((a) => !a.isManager);
+      log.info("Contas cliente encontradas", {
+        total: managed.length,
+        clients: clientAccounts.length,
+      });
+
+      if (clientAccounts.length === 0) {
+        log.warn("MCC sem contas cliente");
+        redirect("/settings?error=google-ads-no-client-accounts");
+      }
+
+      // Cache the full list of managed accounts for account switching
+      managedAccountsJson = JSON.stringify(
+        clientAccounts.map((a) => ({ id: a.id, name: a.name }))
+      );
+
+      loginCustomerId = customerId; // MCC ID for the login-customer-id header
+      customerId = clientAccounts[0].id; // Use the first client account
+      log.info("Usando conta cliente do MCC", {
+        mccId: loginCustomerId,
+        clientId: customerId,
+        clientName: clientAccounts[0].name,
+        totalAccounts: clientAccounts.length,
+      });
+    }
+
+    // Validate that we can actually query this account via the Google Ads API.
+    // This catches the MCC mismatch problem: OAuth + listAccessibleCustomers work
+    // (they only need OAuth), but googleAds:search also validates the developer token.
+    // If the user's account is NOT managed by the developer token's MCC, this fails with 403.
+    log.info("Validando acesso a API antes de salvar conexao", {
+      customerId,
+      loginCustomerId,
+    });
+    const validation = await validateAccountAccess(
+      customerId,
+      tokens.access_token,
+      loginCustomerId
+    );
+    if (!validation.valid) {
+      const errorCode = validation.error.code;
+      log.error("Validacao de acesso falhou — conta nao sera salva", {
+        userId,
+        customerId,
+        loginCustomerId,
+        errorCode,
+        errorMessage: validation.error.message,
+      });
+      const detail = encodeURIComponent(validation.error.message);
+      redirect(`/settings?error=${errorCode}&detail=${detail}`);
+    }
+
     const tokenExpiry = new Date(Date.now() + tokens.expires_in * 1000);
 
     await prisma.googleAdsConnection.upsert({
@@ -51,20 +118,27 @@ export async function GET(req: NextRequest) {
       create: {
         userId,
         customerId,
+        loginCustomerId,
+        managedAccounts: managedAccountsJson,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         tokenExpiry,
       },
       update: {
         customerId,
+        loginCustomerId,
+        managedAccounts: managedAccountsJson,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         tokenExpiry,
       },
     });
 
-    log.info("Google Ads conectado com sucesso", { userId, customerId });
+    log.info("Google Ads conectado com sucesso", { userId, customerId, loginCustomerId });
   } catch (err) {
+    if (err instanceof Error && "digest" in err && String(err.digest).startsWith("NEXT_REDIRECT")) {
+      throw err;
+    }
     const errorMsg = String(err);
     log.error("Erro no OAuth Google Ads", { error: errorMsg });
     const detail = encodeURIComponent(errorMsg.slice(0, 300));

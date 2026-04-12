@@ -76,3 +76,27 @@ export async function fetchMessages(instanceName: string, phone: string) {
     }),
   });
 }
+
+export async function fetchChats(instanceName: string) {
+  log.info("Buscando chats", { instance: instanceName });
+  return evoFetch(`/chat/findChats/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function setWebhook(instanceName: string, webhookUrl: string) {
+  log.info("Configurando webhook", { instance: instanceName, url: webhookUrl });
+  return evoFetch(`/webhook/set/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: false,
+        webhookBase64: false,
+        events: ["MESSAGES_UPSERT"],
+      },
+    }),
+  });
+}
