@@ -112,6 +112,7 @@ model Message {
   content   String
   fromMe    Boolean  @default(false)
   timestamp DateTime @default(now())
+  remoteJid String?
 
   leadId    String
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
