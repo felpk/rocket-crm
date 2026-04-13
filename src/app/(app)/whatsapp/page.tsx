@@ -15,6 +15,7 @@ import {
   CheckCheck,
   Check,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -142,6 +143,8 @@ export default function WhatsAppPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [qrTimer, setQrTimer] = useState(0);
+  const [qrExpired, setQrExpired] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const qrRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -313,6 +316,28 @@ export default function WhatsAppPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // QR Code expiration countdown
+  useEffect(() => {
+    if (!qrData) {
+      setQrTimer(0);
+      return;
+    }
+    setQrExpired(false);
+    setQrTimer(40);
+    const interval = setInterval(() => {
+      setQrTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setQrData(null);
+          setQrExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrData]);
 
   // Poll messages when chat is open and connected
   useEffect(() => {
@@ -600,6 +625,12 @@ export default function WhatsAppPage() {
                 {qrError}
               </div>
             )}
+            <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-yellow-500">
+                É necessário desconectar o WhatsApp Web de outras sessões ativas antes de escanear.
+              </p>
+            </div>
             {qrData ? (
               <div className="text-center">
                 <p className="text-sm text-white/60 mb-3">
@@ -610,10 +641,22 @@ export default function WhatsAppPage() {
                   alt="QR Code WhatsApp"
                   className="w-64 h-64 rounded-lg bg-white p-2 mx-auto"
                 />
-                <p className="text-xs text-white/40 mt-2">Aguardando conexao...</p>
+                <div className="flex items-center justify-center gap-2 mt-3 text-sm">
+                  <Clock className="w-4 h-4 text-white/40" />
+                  <span className={qrTimer <= 10 ? "text-error" : "text-white/60"}>
+                    Expira em {qrTimer}s
+                  </span>
+                </div>
+                <p className="text-xs text-white/40 mt-1">
+                  O QR Code se renova automaticamente a cada 40 segundos.
+                </p>
               </div>
             ) : qrLoading ? (
               <p className="text-center text-white/60 py-8">Gerando QR Code...</p>
+            ) : qrExpired ? (
+              <p className="text-center text-sm text-error py-4">
+                QR Code expirado. Aguarde um novo ou feche e reconecte.
+              </p>
             ) : null}
             <button
               onClick={() => { setShowQrModal(false); stopQrPolling(); }}
