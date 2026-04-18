@@ -31,7 +31,7 @@ const prisma = new PrismaClient({ adapter });
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
 const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET || "";
-const API_BASE = "https://googleads.googleapis.com/v20";
+const API_BASE = "https://googleads.googleapis.com/v23";
 
 function separator(title: string) {
   console.log(`\n${"=".repeat(60)}`);

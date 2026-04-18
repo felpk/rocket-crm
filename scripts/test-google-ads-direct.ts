@@ -19,7 +19,7 @@ const prisma = new PrismaClient({ adapter });
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
 const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET || "";
-const API_BASE = "https://googleads.googleapis.com/v20";
+const API_BASE = "https://googleads.googleapis.com/v23";
 
 async function refreshToken(refreshToken: string) {
   const res = await fetch("https://oauth2.googleapis.com/token", {
