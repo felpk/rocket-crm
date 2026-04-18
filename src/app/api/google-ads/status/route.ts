@@ -23,7 +23,7 @@ export async function GET() {
 
     const connection = await prisma.googleAdsConnection.findUnique({
       where: { userId: session.id },
-      select: { customerId: true, accountName: true, managedAccounts: true, lastSyncAt: true, createdAt: true },
+      select: { customerId: true, accountName: true, loginCustomerId: true, managedAccounts: true, lastSyncAt: true, createdAt: true },
     });
 
     if (!connection) {
@@ -31,9 +31,23 @@ export async function GET() {
       return Response.json({ connected: false });
     }
 
-    log.debug("Google Ads conectado", { userId: session.id, customerId: connection.customerId });
+    // Detect if this was assigned by admin (client shares MCC tokens)
+    let assignedByAdmin = false;
+    if (session.role === "client" && connection.loginCustomerId) {
+      const adminConnection = await prisma.googleAdsConnection.findFirst({
+        where: {
+          user: { role: "admin" },
+          loginCustomerId: connection.loginCustomerId,
+        },
+        select: { id: true },
+      });
+      assignedByAdmin = !!adminConnection;
+    }
+
+    log.debug("Google Ads conectado", { userId: session.id, customerId: connection.customerId, assignedByAdmin });
     return Response.json({
       connected: true,
+      assignedByAdmin,
       customerId: connection.customerId,
       accountName: connection.accountName,
       lastSyncAt: connection.lastSyncAt,

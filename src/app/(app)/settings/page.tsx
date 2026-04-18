@@ -6,6 +6,7 @@ import { Settings, Link2, Link2Off, CheckCircle, AlertCircle } from "lucide-reac
 
 interface GoogleAdsStatus {
   connected: boolean;
+  assignedByAdmin?: boolean;
   customerId?: string;
   accountName?: string;
 }
@@ -132,6 +133,21 @@ export default function SettingsPage() {
               <Link2Off className="w-4 h-4" />
               Desconectar
             </button>
+          </div>
+        ) : gadsStatus?.assignedByAdmin ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Link2 className="w-5 h-5 text-success" />
+              <div>
+                <p className="font-medium">Conectado pela Rocket</p>
+                <p className="text-sm text-white/50">
+                  Conta: {gadsStatus.accountName || gadsStatus.customerId}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-white/40">
+              Sua conta Google Ads foi configurada pelo administrador. Acesse a pagina Google Ads para ver suas metricas.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">

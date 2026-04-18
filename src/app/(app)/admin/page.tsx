@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { Users, Target, Zap } from "lucide-react";
+import GoogleAdsAssignment from "@/components/admin/GoogleAdsAssignment";
 
 export default async function AdminPage() {
   await requireAdmin();
@@ -37,6 +38,18 @@ export default async function AdminPage() {
             <p className="text-3xl font-bold">{stat.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Google Ads Account Assignment */}
+      <div className="mb-8">
+        <GoogleAdsAssignment
+          clients={clients.map(c => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            company: c.company,
+          }))}
+        />
       </div>
 
       {/* Client list */}
