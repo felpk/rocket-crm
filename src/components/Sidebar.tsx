@@ -138,6 +138,9 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
             <LogOut className="w-4 h-4" />
             Sair
           </button>
+          <p className="text-[10px] text-white/20 mt-3 text-center select-none">
+            v{process.env.NEXT_PUBLIC_VERSION}
+          </p>
         </div>
       </aside>
     </>
