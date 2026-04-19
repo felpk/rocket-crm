@@ -48,6 +48,11 @@ Next.js 16 Route Handlers implementing the REST API.
 | GET | `/google-ads/campaigns` | Required | Fetch campaign metrics (last 30 days, auto-refreshes token) |
 | GET | `/google-ads/summary` | Required | Fetch account summary metrics |
 
+### Dashboard (`/api/dashboard/`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/dashboard` | Required | Comprehensive dashboard data: KPIs, stages, origins, recent leads, daily trend, automations, integrations, messages. Multi-tenant: clients see own data, admin sees all. All queries run in parallel via Promise.all. |
+
 ### Admin (`/api/admin/`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
