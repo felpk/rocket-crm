@@ -43,18 +43,18 @@ interface OriginCount {
 
 interface DashboardData {
   totalLeads: number;
-  newToday: number;
-  conversions: number;
-  totalValue: number;
+  newLeadsToday: number;
+  totalConversions: number;
+  funnelValue: number;
   conversionRate: number;
-  stageCounts: StageCount[];
-  originCounts: OriginCount[];
+  stages: StageCount[];
+  origins: OriginCount[];
   recentLeads: DashboardLead[];
   whatsappConnected: boolean;
   googleAdsConnected: boolean;
-  googleAdsAccount: string | null;
+  googleAdsAccountName: string | null;
   activeAutomations: number;
-  messagesToday: number;
+  messagesSentToday: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -225,7 +225,7 @@ export default function DashboardPage() {
   if (loading || !data) return <LoadingSkeleton />;
 
   const maxFunnelCount = Math.max(
-    ...data.stageCounts.map((s) => s.count),
+    ...data.stages.map((s) => s.count),
     1,
   );
 
@@ -260,7 +260,7 @@ export default function DashboardPage() {
           {
             icon: Plus,
             label: "Novos",
-            value: `+${data.newToday}`,
+            value: `+${data.newLeadsToday}`,
             sub: "hoje",
             color: "text-[#22C55E]",
             subColor: "text-[#22C55E]",
@@ -268,14 +268,14 @@ export default function DashboardPage() {
           {
             icon: Users,
             label: "Conversões",
-            value: String(data.conversions),
+            value: String(data.totalConversions),
             sub: `${data.conversionRate.toFixed(1)}% do total`,
             color: "text-[#22C55E]",
           },
           {
             icon: DollarSign,
             label: "Valor",
-            value: formatCompact(data.totalValue),
+            value: formatCompact(data.funnelValue),
             sub: "no funil",
             color: "text-[#EAB308]",
           },
@@ -318,7 +318,7 @@ export default function DashboardPage() {
             </h2>
           </div>
           <div className="space-y-2 flex-1 flex flex-col justify-center">
-            {data.stageCounts.map((sc) => {
+            {data.stages.map((sc) => {
               const pct = (sc.count / maxFunnelCount) * 100;
               return (
                 <div key={sc.stage} className="flex items-center gap-2">
@@ -357,9 +357,9 @@ export default function DashboardPage() {
 
           {/* Desktop: donut + legend */}
           <div className="hidden md:flex items-center justify-center gap-6 flex-1">
-            <DonutChart origins={data.originCounts} />
+            <DonutChart origins={data.origins} />
             <div className="space-y-2.5">
-              {data.originCounts.map((o) => (
+              {data.origins.map((o) => (
                 <div key={o.origin} className="flex items-center gap-2">
                   <div
                     className={`w-2.5 h-2.5 rounded-full shrink-0 ${ORIGIN_COLORS[o.origin] ?? "bg-gray-500"}`}
@@ -377,7 +377,7 @@ export default function DashboardPage() {
 
           {/* Mobile: simple list */}
           <div className="md:hidden space-y-2 flex-1 flex flex-col justify-center">
-            {data.originCounts.map((o) => (
+            {data.origins.map((o) => (
               <div
                 key={o.origin}
                 className="flex items-center justify-between"
@@ -484,7 +484,7 @@ export default function DashboardPage() {
                 className={`text-[11px] ml-auto font-medium ${data.googleAdsConnected ? "text-[#22C55E]" : "text-white/40"}`}
               >
                 {data.googleAdsConnected
-                  ? data.googleAdsAccount ?? "Conectado"
+                  ? data.googleAdsAccountName ?? "Conectado"
                   : "Não conectado"}
               </span>
             </div>
@@ -501,7 +501,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2.5">
               <MessageSquare className="w-3.5 h-3.5 text-[#3b6fd4]" />
               <span className="text-xs text-white/70 ml-0.5">
-                {data.messagesToday} mensagens hoje
+                {data.messagesSentToday} mensagens hoje
               </span>
             </div>
           </div>

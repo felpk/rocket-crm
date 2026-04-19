@@ -181,10 +181,12 @@ export async function GET() {
       value: s._sum.value || 0,
     }));
 
-    // Format origins
+    // Format origins with percentage
+    const totalOriginCount = originsRaw.reduce((sum, o) => sum + o._count, 0);
     const origins = originsRaw.map((o) => ({
       origin: o.origin || "desconhecido",
       count: o._count,
+      percentage: totalOriginCount > 0 ? (o._count / totalOriginCount) * 100 : 0,
     }));
 
     // Format recent leads
