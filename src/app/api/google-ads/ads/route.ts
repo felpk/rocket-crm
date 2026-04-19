@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   try {
     session = await requireAuth();
   } catch {
-    return Response.json({ error: "Nao autorizado" }, { status: 401 });
+    return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
   try {
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 
     const token = await getValidToken(userId);
     if (!token) {
-      return Response.json({ error: "Google Ads nao conectado" }, { status: 404 });
+      return Response.json({ error: "Google Ads não conectado" }, { status: 404 });
     }
 
     try {
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
           return Response.json(result);
         }
         return Response.json(
-          { error: "Token expirado - reconecte nas configuracoes." },
+          { error: "Token expirado - reconecte nas configurações." },
           { status: 401 }
         );
       }

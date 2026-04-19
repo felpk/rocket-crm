@@ -28,8 +28,8 @@ export async function POST(req: Request) {
     });
 
     if (!connection) {
-      log.warn("Google Ads nao conectado", { userId: session.id });
-      return Response.json({ error: "Google Ads nao conectado" }, { status: 404 });
+      log.warn("Google Ads não conectado", { userId: session.id });
+      return Response.json({ error: "Google Ads não conectado" }, { status: 404 });
     }
 
     const managedAccounts = connection.managedAccounts
@@ -41,9 +41,9 @@ export async function POST(req: Request) {
     );
 
     if (!account) {
-      log.warn("Conta nao encontrada na lista", { userId: session.id, customerId });
+      log.warn("Conta não encontrada na lista", { userId: session.id, customerId });
       return Response.json(
-        { error: "Conta nao encontrada na lista de contas gerenciadas" },
+        { error: "Conta não encontrada na lista de contas gerenciadas" },
         { status: 400 }
       );
     }

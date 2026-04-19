@@ -6,19 +6,17 @@ import {
   BarChart3,
   Clock,
   Link2,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
 import AccountSwitcher from "@/components/google-ads/AccountSwitcher";
 import DateRangeSelector from "@/components/google-ads/DateRangeSelector";
-import LevelSelector from "@/components/google-ads/LevelSelector";
 import KpiCards from "@/components/google-ads/KpiCards";
 import CampaignTable from "@/components/google-ads/CampaignTable";
 import KeywordsPanel from "@/components/google-ads/KeywordsPanel";
 import AudiencePanel from "@/components/google-ads/AudiencePanel";
 import InsightsPanel from "@/components/google-ads/InsightsPanel";
-
-type Level = "basico" | "detalhado" | "completo";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyData = any;
@@ -29,13 +27,6 @@ function formatTimestamp(iso: string) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-const TAB_LABELS: Record<string, string> = {
-  campanhas: "Campanhas",
-  "palavras-chave": "Palavras-chave",
-  audiencia: "Audiencia",
-  insights: "Insights",
-};
-
 export default function GoogleAdsPage() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,9 +34,8 @@ export default function GoogleAdsPage() {
   const [mounted, setMounted] = useState(false);
 
   // Controls
-  const [level, setLevel] = useState<Level>("basico");
   const [dateRange, setDateRange] = useState("ALL_TIME");
-  const [activeTab, setActiveTab] = useState("campanhas");
+  const [selectedCampaign, setSelectedCampaign] = useState("all");
 
   // Account switching
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
@@ -57,16 +47,12 @@ export default function GoogleAdsPage() {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
 
-  // Data — basico
+  // Data
   const [summary, setSummary] = useState<AnyData>(null);
   const [campaigns, setCampaigns] = useState<AnyData[]>([]);
-
-  // Data — detalhado
   const [adGroups, setAdGroups] = useState<AnyData[]>([]);
   const [keywords, setKeywords] = useState<AnyData[]>([]);
   const [searchTerms, setSearchTerms] = useState<AnyData[]>([]);
-
-  // Data — completo
   const [devices, setDevices] = useState<AnyData[]>([]);
   const [demographics, setDemographics] = useState<{ age: AnyData[]; gender: AnyData[] }>({ age: [], gender: [] });
   const [locations, setLocations] = useState<AnyData[]>([]);
@@ -77,7 +63,7 @@ export default function GoogleAdsPage() {
 
   useEffect(() => setMounted(true), []);
 
-  const fetchData = useCallback(async (currentLevel: Level, currentDateRange: string) => {
+  const fetchData = useCallback(async (currentDateRange: string) => {
     setLoading(true);
     setError(null);
 
@@ -114,21 +100,26 @@ export default function GoogleAdsPage() {
       const dr = `?dateRange=${currentDateRange}`;
       const errors: string[] = [];
 
-      // Basico: summary + campaigns (always fetched)
-      const basicFetches = [
+      // Fetch ALL endpoints in parallel
+      const [
+        summaryRes,
+        campaignsRes,
+        adGroupsRes,
+        keywordsRes,
+        searchTermsRes,
+        devicesRes,
+        demographicsRes,
+        locationsRes,
+        dailyRes,
+        budgetsRes,
+        changeHistoryRes,
+        recommendationsRes,
+      ] = await Promise.all([
         fetch(`/api/google-ads/summary${dr}`),
         fetch(`/api/google-ads/campaigns${dr}`),
-      ];
-
-      // Detalhado: + ad-groups, keywords, search-terms
-      const detailedFetches = currentLevel !== "basico" ? [
         fetch(`/api/google-ads/ad-groups${dr}`),
         fetch(`/api/google-ads/keywords${dr}`),
         fetch(`/api/google-ads/search-terms${dr}`),
-      ] : [];
-
-      // Completo: + all remaining
-      const completeFetches = currentLevel === "completo" ? [
         fetch(`/api/google-ads/devices${dr}`),
         fetch(`/api/google-ads/demographics${dr}`),
         fetch(`/api/google-ads/locations${dr}`),
@@ -136,19 +127,9 @@ export default function GoogleAdsPage() {
         fetch(`/api/google-ads/budgets${dr}`),
         fetch(`/api/google-ads/change-history${dr}`),
         fetch(`/api/google-ads/recommendations${dr}`),
-      ] : [];
-
-      const allResponses = await Promise.all([
-        ...basicFetches,
-        ...detailedFetches,
-        ...completeFetches,
       ]);
 
-      let idx = 0;
-
-      // Parse basic
-      const [summaryRes, campaignsRes] = [allResponses[idx++], allResponses[idx++]];
-
+      // Parse responses
       if (summaryRes.ok) {
         setSummary(await summaryRes.json());
       } else {
@@ -164,36 +145,35 @@ export default function GoogleAdsPage() {
         errors.push(err?.error || `Campaigns falhou (${campaignsRes.status})`);
       }
 
-      // Parse detailed
-      if (currentLevel !== "basico") {
-        const [agRes, kwRes, stRes] = [allResponses[idx++], allResponses[idx++], allResponses[idx++]];
+      if (adGroupsRes.ok) setAdGroups(await adGroupsRes.json());
+      else errors.push("Falha ao carregar grupos de anúncios");
 
-        if (agRes.ok) setAdGroups(await agRes.json());
-        else errors.push("Falha ao carregar grupos de anuncios");
+      if (keywordsRes.ok) setKeywords(await keywordsRes.json());
+      else errors.push("Falha ao carregar palavras-chave");
 
-        if (kwRes.ok) setKeywords(await kwRes.json());
-        else errors.push("Falha ao carregar palavras-chave");
+      if (searchTermsRes.ok) setSearchTerms(await searchTermsRes.json());
+      else errors.push("Falha ao carregar termos de busca");
 
-        if (stRes.ok) setSearchTerms(await stRes.json());
-        else errors.push("Falha ao carregar termos de busca");
-      }
+      if (devicesRes.ok) setDevices(await devicesRes.json());
+      else errors.push("Falha: dispositivos");
 
-      // Parse complete
-      if (currentLevel === "completo") {
-        const resArr = allResponses.slice(idx);
-        const setters = [
-          async (r: Response) => { if (r.ok) setDevices(await r.json()); else errors.push("Falha: dispositivos"); },
-          async (r: Response) => { if (r.ok) setDemographics(await r.json()); else errors.push("Falha: demografia"); },
-          async (r: Response) => { if (r.ok) setLocations(await r.json()); else errors.push("Falha: localizacoes"); },
-          async (r: Response) => { if (r.ok) setDaily(await r.json()); else errors.push("Falha: performance diaria"); },
-          async (r: Response) => { if (r.ok) setBudgets(await r.json()); else errors.push("Falha: orcamentos"); },
-          async (r: Response) => { if (r.ok) setChangeHistory(await r.json()); else errors.push("Falha: historico"); },
-          async (r: Response) => { if (r.ok) setRecommendations(await r.json()); else errors.push("Falha: recomendacoes"); },
-        ];
-        for (let i = 0; i < resArr.length; i++) {
-          await setters[i](resArr[i]);
-        }
-      }
+      if (demographicsRes.ok) setDemographics(await demographicsRes.json());
+      else errors.push("Falha: demografia");
+
+      if (locationsRes.ok) setLocations(await locationsRes.json());
+      else errors.push("Falha: localizações");
+
+      if (dailyRes.ok) setDaily(await dailyRes.json());
+      else errors.push("Falha: performance diária");
+
+      if (budgetsRes.ok) setBudgets(await budgetsRes.json());
+      else errors.push("Falha: orçamentos");
+
+      if (changeHistoryRes.ok) setChangeHistory(await changeHistoryRes.json());
+      else errors.push("Falha: histórico");
+
+      if (recommendationsRes.ok) setRecommendations(await recommendationsRes.json());
+      else errors.push("Falha: recomendações");
 
       if (errors.length > 0) {
         setError(errors.join(" | "));
@@ -206,8 +186,8 @@ export default function GoogleAdsPage() {
   }, [accounts.length]);
 
   useEffect(() => {
-    fetchData(level, dateRange);
-  }, [level, dateRange, fetchData]);
+    fetchData(dateRange);
+  }, [dateRange, fetchData]);
 
   async function handleSwitchAccount(customerId: string) {
     setSwitching(true);
@@ -220,8 +200,8 @@ export default function GoogleAdsPage() {
       if (res.ok) {
         const data = await res.json();
         setCurrentCustomerId(data.customerId);
-        // Reload all data for new account
-        await fetchData(level, dateRange);
+        setSelectedCampaign("all");
+        await fetchData(dateRange);
       } else {
         const err = await res.json().catch(() => null);
         setError(err?.error || "Falha ao trocar conta");
@@ -232,6 +212,35 @@ export default function GoogleAdsPage() {
     setSwitching(false);
   }
 
+  // Campaign filter logic
+  const campaignNames: string[] = campaigns
+    .map((c: AnyData) => c.name || c.campaignName || "")
+    .filter(Boolean);
+
+  const filteredAdGroups =
+    selectedCampaign === "all"
+      ? adGroups
+      : adGroups.filter(
+          (ag: AnyData) =>
+            (ag.campaignName || ag.campaign) === selectedCampaign
+        );
+
+  const filteredKeywords =
+    selectedCampaign === "all"
+      ? keywords
+      : keywords.filter(
+          (kw: AnyData) =>
+            (kw.campaignName || kw.campaign) === selectedCampaign
+        );
+
+  const filteredSearchTerms =
+    selectedCampaign === "all"
+      ? searchTerms
+      : searchTerms.filter(
+          (st: AnyData) =>
+            (st.campaignName || st.campaign) === selectedCampaign
+        );
+
   // --- Loading state ---
   if (loading && connected === null) {
     return (
@@ -239,7 +248,7 @@ export default function GoogleAdsPage() {
         <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
         <div className="bg-card rounded-xl p-12 text-center">
           <BarChart3 className="w-10 h-10 text-accent mx-auto mb-3 animate-pulse" />
-          <p className="text-white/50">Carregando metricas...</p>
+          <p className="text-white/50">Carregando métricas...</p>
         </div>
       </div>
     );
@@ -252,15 +261,15 @@ export default function GoogleAdsPage() {
         <h1 className="text-2xl font-bold mb-6">Google Ads</h1>
         <div className="bg-card rounded-xl p-12 text-center">
           <Link2 className="w-12 h-12 text-accent mx-auto mb-4 opacity-50" />
-          <h2 className="text-lg font-semibold mb-2">Google Ads nao conectado</h2>
+          <h2 className="text-lg font-semibold mb-2">Google Ads não conectado</h2>
           <p className="text-white/50 text-sm mb-6 max-w-md mx-auto">
-            Conecte sua conta Google Ads nas configuracoes para visualizar metricas de campanhas.
+            Conecte sua conta Google Ads nas configurações para visualizar métricas de campanhas.
           </p>
           <Link
             href="/settings"
             className="inline-flex items-center gap-2 bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors"
           >
-            Ir para Configuracoes
+            Ir para Configurações
           </Link>
         </div>
       </div>
@@ -285,9 +294,9 @@ export default function GoogleAdsPage() {
         <div className="bg-card rounded-xl p-12 text-center">
           <BarChart3 className="w-12 h-12 text-red-400 mx-auto mb-4 opacity-50" />
           <h2 className="text-lg font-semibold mb-2">
-            {isAccountNotEnabled ? "Conta Google Ads nao ativada"
-              : isMccMismatch ? "Conta nao vinculada ao MCC"
-              : isTokenError ? "Problema de autenticacao"
+            {isAccountNotEnabled ? "Conta Google Ads não ativada"
+              : isMccMismatch ? "Conta não vinculada ao MCC"
+              : isTokenError ? "Problema de autenticação"
               : "Erro ao carregar dados"}
           </h2>
           <p className="text-white/70 text-sm mb-4 max-w-lg mx-auto">{error}</p>
@@ -296,15 +305,15 @@ export default function GoogleAdsPage() {
               <p className="text-yellow-200/80 text-sm font-medium mb-2">O que fazer:</p>
               <ol className="text-yellow-200/60 text-sm space-y-1 list-decimal list-inside">
                 <li>Acesse <span className="text-yellow-200/80 font-medium">ads.google.com</span></li>
-                <li>Aceite os Termos de Servico</li>
+                <li>Aceite os Termos de Serviço</li>
                 <li>Configure o faturamento</li>
-                <li>Volte e reconecte nas Configuracoes</li>
+                <li>Volte e reconecte nas Configurações</li>
               </ol>
             </div>
           )}
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => fetchData(level, dateRange)}
+              onClick={() => fetchData(dateRange)}
               className="bg-accent hover:bg-accent/80 px-6 py-3 rounded-lg font-medium transition-colors"
             >
               Tentar novamente
@@ -313,24 +322,12 @@ export default function GoogleAdsPage() {
               href="/settings"
               className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-lg font-medium transition-colors"
             >
-              Configuracoes
+              Configurações
             </Link>
           </div>
         </div>
       </div>
     );
-  }
-
-  // --- Available tabs based on level ---
-  const tabs = ["campanhas"];
-  if (level !== "basico") tabs.push("palavras-chave");
-  if (level === "completo") {
-    tabs.push("audiencia", "insights");
-  }
-
-  // Reset tab if current tab no longer available
-  if (!tabs.includes(activeTab)) {
-    setActiveTab("campanhas");
   }
 
   return (
@@ -363,13 +360,27 @@ export default function GoogleAdsPage() {
             />
           )}
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
-          <div className="ml-auto">
-            <LevelSelector value={level} onChange={setLevel} />
+
+          {/* Campaign filter dropdown */}
+          <div className="relative">
+            <select
+              value={selectedCampaign}
+              onChange={(e) => setSelectedCampaign(e.target.value)}
+              className="appearance-none bg-card border border-white/10 text-white text-sm rounded-lg px-4 py-2 pr-8 focus:outline-none focus:border-accent/50 cursor-pointer"
+            >
+              <option value="all">Todas as campanhas</option>
+              {campaignNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
           </div>
         </div>
       </div>
 
-      {/* Loading overlay for data refresh */}
+      {/* Loading bar */}
       {loading && connected && (
         <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 mb-4 flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-accent animate-pulse" />
@@ -382,14 +393,14 @@ export default function GoogleAdsPage() {
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-yellow-200 text-sm font-medium">Atencao</p>
+            <p className="text-yellow-200 text-sm font-medium">Atenção</p>
             <p className="text-yellow-200/70 text-sm">{error}</p>
           </div>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <KpiCards summary={summary} level={level} />
+      {/* KPI Cards -- always show all 7 metrics (account total, not filtered) */}
+      <KpiCards summary={summary} />
 
       {/* Zero metrics hint */}
       {summary && summary.impressions === 0 && summary.clicks === 0 && campaigns.length > 0 && (
@@ -398,64 +409,48 @@ export default function GoogleAdsPage() {
           <div>
             <p className="text-white/80 text-sm font-medium">Campanhas sem dados</p>
             <p className="text-white/50 text-sm">
-              Suas campanhas foram encontradas, mas nenhuma gerou impressoes.
-              Verifique no Google Ads se a configuracao esta completa.
+              Suas campanhas foram encontradas, mas nenhuma gerou impressões.
+              Verifique no Google Ads se a configuração está completa.
             </p>
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      {tabs.length > 1 && (
-        <div className="flex border-b border-white/10 mb-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === tab
-                  ? "border-accent text-white"
-                  : "border-transparent text-white/50 hover:text-white/70"
-              }`}
-            >
-              {TAB_LABELS[tab]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Tab Content */}
-      {activeTab === "campanhas" && (
-        <>
-          <h2 className="text-lg font-semibold mb-4">Campanhas</h2>
-          <CampaignTable
-            campaigns={campaigns}
-            adGroups={adGroups}
-            level={level}
-          />
-        </>
-      )}
-
-      {activeTab === "palavras-chave" && (
-        <KeywordsPanel keywords={keywords} searchTerms={searchTerms} />
-      )}
-
-      {activeTab === "audiencia" && (
-        <AudiencePanel
-          devices={devices}
-          demographics={demographics}
-          locations={locations}
-        />
-      )}
-
-      {activeTab === "insights" && (
+      {/* Performance chart section -- daily performance + insights */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4">Performance e Insights</h2>
         <InsightsPanel
           daily={daily}
           budgets={budgets}
           changeHistory={changeHistory}
           recommendations={recommendations}
         />
-      )}
+      </div>
+
+      {/* Campaigns table -- all columns, expandable ad groups */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4">Campanhas</h2>
+        <CampaignTable
+          campaigns={campaigns}
+          adGroups={filteredAdGroups}
+        />
+      </div>
+
+      {/* Keywords section */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4">Palavras-chave</h2>
+        <KeywordsPanel keywords={filteredKeywords} searchTerms={filteredSearchTerms} />
+      </div>
+
+      {/* Audience section */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4">Audiência</h2>
+        <AudiencePanel
+          devices={devices}
+          demographics={demographics}
+          locations={locations}
+        />
+      </div>
     </div>
   );
 }

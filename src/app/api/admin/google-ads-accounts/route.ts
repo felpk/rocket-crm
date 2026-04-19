@@ -15,7 +15,7 @@ export async function GET() {
   try {
     await requireAdmin();
   } catch {
-    return Response.json({ error: "Nao autorizado" }, { status: 403 });
+    return Response.json({ error: "Não autorizado" }, { status: 403 });
   }
 
   try {
@@ -25,7 +25,7 @@ export async function GET() {
       select: { id: true },
     });
     if (!admin) {
-      return Response.json({ error: "Admin nao encontrado" }, { status: 404 });
+      return Response.json({ error: "Admin não encontrado" }, { status: 404 });
     }
 
     const adminConnection = await prisma.googleAdsConnection.findUnique({
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
   try {
     await requireAdmin();
   } catch {
-    return Response.json({ error: "Nao autorizado" }, { status: 403 });
+    return Response.json({ error: "Não autorizado" }, { status: 403 });
   }
 
   try {
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     const { userId, customerId } = body;
 
     if (!userId) {
-      return Response.json({ error: "userId obrigatorio" }, { status: 400 });
+      return Response.json({ error: "userId obrigatório" }, { status: 400 });
     }
 
     // Verify client exists
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
       select: { id: true, name: true, role: true },
     });
     if (!client || client.role !== "client") {
-      return Response.json({ error: "Cliente nao encontrado" }, { status: 404 });
+      return Response.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
 
     // Unassign
@@ -152,14 +152,14 @@ export async function POST(req: Request) {
       select: { id: true },
     });
     if (!admin) {
-      return Response.json({ error: "Admin nao encontrado" }, { status: 404 });
+      return Response.json({ error: "Admin não encontrado" }, { status: 404 });
     }
 
     const adminConnection = await prisma.googleAdsConnection.findUnique({
       where: { userId: admin.id },
     });
     if (!adminConnection) {
-      return Response.json({ error: "Admin nao conectou Google Ads" }, { status: 400 });
+      return Response.json({ error: "Admin não conectou Google Ads" }, { status: 400 });
     }
 
     // Find account name from managed accounts

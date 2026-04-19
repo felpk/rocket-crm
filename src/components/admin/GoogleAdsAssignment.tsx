@@ -69,9 +69,9 @@ export default function GoogleAdsAssignment({ clients }: { clients: Client[] }) 
       if (!res.ok) throw new Error(data.error || "Falha");
 
       if (data.action === "assigned") {
-        setSuccess(`Conta ${data.accountName} atribuida com sucesso`);
+        setSuccess(`Conta ${data.accountName} atribuída com sucesso`);
       } else {
-        setSuccess("Conta desatribuida com sucesso");
+        setSuccess("Conta desatribuída com sucesso");
       }
       await loadAccounts();
     } catch (err) {
@@ -109,7 +109,7 @@ export default function GoogleAdsAssignment({ clients }: { clients: Client[] }) 
         </div>
         <p className="text-white/50 text-sm">
           Conecte sua conta MCC do Google Ads nas{" "}
-          <a href="/settings" className="text-accent underline">Configuracoes</a>{" "}
+          <a href="/settings" className="text-accent underline">Configurações</a>{" "}
           para poder atribuir contas aos clientes.
         </p>
       </div>
@@ -211,7 +211,7 @@ export default function GoogleAdsAssignment({ clients }: { clients: Client[] }) 
         return (
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-xs text-white/40 mb-2">
-              {unassigned.length} cliente(s) sem conta Google Ads atribuida
+              {unassigned.length} cliente(s) sem conta Google Ads atribuída
             </p>
             <div className="flex flex-wrap gap-2">
               {unassigned.map(c => (

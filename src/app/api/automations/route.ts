@@ -24,10 +24,10 @@ export async function GET() {
       actions: JSON.parse(a.actions),
     }));
 
-    log.info("Automacoes listadas", { count: parsed.length });
+    log.info("Automações listadas", { count: parsed.length });
     return Response.json(parsed);
   } catch (err) {
-    log.error("Erro ao listar automacoes", { error: String(err) });
+    log.error("Erro ao listar automações", { error: String(err) });
     return Response.json({ error: "Erro interno" }, { status: 500 });
   }
 }
@@ -40,15 +40,15 @@ export async function POST(req: Request) {
 
     // Validate name
     if (!data.name || typeof data.name !== "string" || !data.name.trim()) {
-      log.warn("Nome invalido", { name: data.name });
-      return Response.json({ error: "Nome e obrigatorio" }, { status: 400 });
+      log.warn("Nome inválido", { name: data.name });
+      return Response.json({ error: "Nome é obrigatório" }, { status: 400 });
     }
 
     // Validate triggerType
     if (!VALID_TRIGGER_TYPES.includes(data.triggerType)) {
-      log.warn("Tipo de trigger invalido", { triggerType: data.triggerType });
+      log.warn("Tipo de trigger inválido", { triggerType: data.triggerType });
       return Response.json(
-        { error: `Tipo de trigger invalido. Validos: ${VALID_TRIGGER_TYPES.join(", ")}` },
+        { error: `Tipo de trigger inválido. Válidos: ${VALID_TRIGGER_TYPES.join(", ")}` },
         { status: 400 }
       );
     }
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     if (data.triggerType === "keyword") {
       if (!Array.isArray(triggerConfig.keywords) || triggerConfig.keywords.length === 0) {
         return Response.json(
-          { error: "triggerConfig.keywords deve ser um array nao vazio" },
+          { error: "triggerConfig.keywords deve ser um array não vazio" },
           { status: 400 }
         );
       }
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     if (data.triggerType === "stage_change") {
       if (!triggerConfig.toStage || typeof triggerConfig.toStage !== "string") {
         return Response.json(
-          { error: "triggerConfig.toStage e obrigatorio para stage_change" },
+          { error: "triggerConfig.toStage é obrigatório para stage_change" },
           { status: 400 }
         );
       }
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     if (data.triggerType === "followup") {
       if (typeof triggerConfig.delayHours !== "number" || triggerConfig.delayHours <= 0) {
         return Response.json(
-          { error: "triggerConfig.delayHours deve ser um numero positivo" },
+          { error: "triggerConfig.delayHours deve ser um número positivo" },
           { status: 400 }
         );
       }
@@ -83,14 +83,14 @@ export async function POST(req: Request) {
     // Validate actions
     if (!Array.isArray(data.actions) || data.actions.length === 0) {
       return Response.json(
-        { error: "actions deve ser um array nao vazio" },
+        { error: "actions deve ser um array não vazio" },
         { status: 400 }
       );
     }
     for (const action of data.actions) {
       if (!VALID_ACTION_TYPES.includes(action.type)) {
         return Response.json(
-          { error: `Tipo de acao invalido: ${action.type}. Validos: ${VALID_ACTION_TYPES.join(", ")}` },
+          { error: `Tipo de ação inválido: ${action.type}. Válidos: ${VALID_ACTION_TYPES.join(", ")}` },
           { status: 400 }
         );
       }
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       },
     });
 
-    log.info("Automacao criada", { id: automation.id, name: automation.name });
+    log.info("Automação criada", { id: automation.id, name: automation.name });
     return Response.json(
       {
         ...automation,
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (err) {
-    log.error("Erro ao criar automacao", { error: String(err) });
+    log.error("Erro ao criar automação", { error: String(err) });
     return Response.json({ error: "Erro interno" }, { status: 500 });
   }
 }

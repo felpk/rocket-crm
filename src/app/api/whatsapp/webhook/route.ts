@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       where: { instanceName },
     });
     if (!connection) {
-      log.warn("Conexao nao encontrada para instancia", { instanceName });
+      log.warn("Conexão não encontrada para instância", { instanceName });
       return Response.json({ ok: true });
     }
     const userId = connection.userId;
@@ -133,7 +133,7 @@ export async function POST(req: Request) {
         return keywords.some((kw) => lowerMessage.includes(kw.toLowerCase()));
       });
     } catch (err) {
-      log.error("Erro ao executar automacoes", { error: String(err) });
+      log.error("Erro ao executar automações", { error: String(err) });
     }
 
     return Response.json({ ok: true });

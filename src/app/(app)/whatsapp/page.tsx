@@ -57,10 +57,10 @@ interface Lead {
 
 const STAGE_LABELS: Record<string, string> = {
   lead: "Lead",
-  qualification: "Qualificacao",
-  meeting: "Reuniao",
+  qualification: "Qualificação",
+  meeting: "Reunião",
   proposal: "Proposta",
-  negotiation: "Negociacao",
+  negotiation: "Negociação",
   closed: "Fechado",
 };
 
@@ -251,9 +251,9 @@ export default function WhatsAppPage() {
       const data = await res.json();
       if (!res.ok) { setQrError(data.error || "Erro ao gerar QR Code"); return; }
       if (data.base64) { setQrData(data.base64); startQrPolling(); }
-      else setQrError("QR Code nao retornado pela API");
+      else setQrError("QR Code não retornado pela API");
     } catch {
-      setQrError("Erro de conexao ao gerar QR Code");
+      setQrError("Erro de conexão ao gerar QR Code");
     } finally {
       setQrLoading(false);
     }
@@ -545,7 +545,7 @@ export default function WhatsAppPage() {
       <div>
         <h1 className="text-2xl font-bold mb-6">WhatsApp</h1>
         <div className="bg-card rounded-xl p-6 text-center text-white/60">
-          Verificando conexao...
+          Verificando conexão...
         </div>
       </div>
     );
@@ -610,7 +610,7 @@ export default function WhatsAppPage() {
                   alt="QR Code WhatsApp"
                   className="w-64 h-64 rounded-lg bg-white p-2 mx-auto"
                 />
-                <p className="text-xs text-white/40 mt-2">Aguardando conexao...</p>
+                <p className="text-xs text-white/40 mt-2">Aguardando conexão...</p>
               </div>
             ) : qrLoading ? (
               <p className="text-center text-white/60 py-8">Gerando QR Code...</p>

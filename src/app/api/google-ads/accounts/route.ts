@@ -24,8 +24,8 @@ export async function GET() {
     });
 
     if (!connection) {
-      log.warn("Google Ads nao conectado", { userId: session.id });
-      return Response.json({ error: "Google Ads nao conectado" }, { status: 404 });
+      log.warn("Google Ads não conectado", { userId: session.id });
+      return Response.json({ error: "Google Ads não conectado" }, { status: 404 });
     }
 
     if (!connection.managedAccounts) {

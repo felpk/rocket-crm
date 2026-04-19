@@ -82,12 +82,12 @@ export default function AudiencePanel({
             <thead>
               <tr className="border-b border-white/10 text-white/60">
                 <th className="text-left p-3 font-medium">Dispositivo</th>
-                <th className="text-right p-3 font-medium">Impressoes</th>
+                <th className="text-right p-3 font-medium">Impressões</th>
                 <th className="text-right p-3 font-medium">Cliques</th>
                 <th className="text-right p-3 font-medium">CTR</th>
                 <th className="text-right p-3 font-medium">CPC</th>
                 <th className="text-right p-3 font-medium">Custo</th>
-                <th className="text-right p-3 font-medium">Conversoes</th>
+                <th className="text-right p-3 font-medium">Conversões</th>
               </tr>
             </thead>
             <tbody>
@@ -124,16 +124,16 @@ export default function AudiencePanel({
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-4">Demografia</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Faixa Etaria */}
+          {/* Faixa Etária */}
           <div className="bg-card rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-white/60">
                   <th className="text-left p-3 font-medium">Faixa</th>
-                  <th className="text-right p-3 font-medium">Impressoes</th>
+                  <th className="text-right p-3 font-medium">Impressões</th>
                   <th className="text-right p-3 font-medium">Cliques</th>
                   <th className="text-right p-3 font-medium">Custo</th>
-                  <th className="text-right p-3 font-medium">Conversoes</th>
+                  <th className="text-right p-3 font-medium">Conversões</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,16 +161,16 @@ export default function AudiencePanel({
             </table>
           </div>
 
-          {/* Genero */}
+          {/* Gênero */}
           <div className="bg-card rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-white/60">
-                  <th className="text-left p-3 font-medium">Genero</th>
-                  <th className="text-right p-3 font-medium">Impressoes</th>
+                  <th className="text-left p-3 font-medium">Gênero</th>
+                  <th className="text-right p-3 font-medium">Impressões</th>
                   <th className="text-right p-3 font-medium">Cliques</th>
                   <th className="text-right p-3 font-medium">Custo</th>
-                  <th className="text-right p-3 font-medium">Conversoes</th>
+                  <th className="text-right p-3 font-medium">Conversões</th>
                 </tr>
               </thead>
               <tbody>
@@ -200,19 +200,19 @@ export default function AudiencePanel({
         </div>
       </div>
 
-      {/* Localizacoes */}
+      {/* Localizações */}
       <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">Localizacoes</h3>
+        <h3 className="text-lg font-semibold mb-4">Localizações</h3>
         <div className="bg-card rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 text-white/60">
-                <th className="text-left p-3 font-medium">Localizacao</th>
-                <th className="text-right p-3 font-medium">Impressoes</th>
+                <th className="text-left p-3 font-medium">Localização</th>
+                <th className="text-right p-3 font-medium">Impressões</th>
                 <th className="text-right p-3 font-medium">Cliques</th>
                 <th className="text-right p-3 font-medium">CTR</th>
                 <th className="text-right p-3 font-medium">Custo</th>
-                <th className="text-right p-3 font-medium">Conversoes</th>
+                <th className="text-right p-3 font-medium">Conversões</th>
               </tr>
             </thead>
             <tbody>

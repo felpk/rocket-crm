@@ -4,8 +4,6 @@ import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-type Level = "basico" | "detalhado" | "completo";
-
 interface Campaign {
   name: string;
   status: string;
@@ -16,17 +14,13 @@ interface Campaign {
   spend: number;
   conversions: number;
   conversionsValue: number;
-  costPerConversion: number;
   searchImpressionShare: number;
 }
 
 interface AdGroup {
   campaignName: string;
-  campaignId: string;
   name: string;
-  id: string;
   status: string;
-  cpcBid: number;
   impressions: number;
   clicks: number;
   ctr: number;
@@ -39,7 +33,6 @@ interface AdGroup {
 interface Props {
   campaigns: Campaign[];
   adGroups: AdGroup[];
-  level: Level;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -70,12 +63,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function CampaignTable({ campaigns, adGroups, level }: Props) {
+export default function CampaignTable({ campaigns, adGroups }: Props) {
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
-  const showExtra = level === "detalhado" || level === "completo";
 
   const toggleExpand = (name: string) => {
-    if (!showExtra) return;
     setExpandedCampaign((prev) => (prev === name ? null : name));
   };
 
@@ -88,7 +79,7 @@ export default function CampaignTable({ campaigns, adGroups, level }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/10 text-white/60">
-              {showExtra && <th className="px-4 py-3 text-left w-8" />}
+              <th className="px-4 py-3 text-left w-8" />
               <th className="px-4 py-3 text-left">Campanha</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-right">Impressões</th>
@@ -96,20 +87,16 @@ export default function CampaignTable({ campaigns, adGroups, level }: Props) {
               <th className="px-4 py-3 text-right">CTR</th>
               <th className="px-4 py-3 text-right">CPC</th>
               <th className="px-4 py-3 text-right">Custo</th>
-              {showExtra && (
-                <>
-                  <th className="px-4 py-3 text-right">Conversões</th>
-                  <th className="px-4 py-3 text-right">Valor Conv.</th>
-                  <th className="px-4 py-3 text-right">Imp. Share</th>
-                </>
-              )}
+              <th className="px-4 py-3 text-right">Conversões</th>
+              <th className="px-4 py-3 text-right">Valor Conv.</th>
+              <th className="px-4 py-3 text-right">Imp. Share</th>
             </tr>
           </thead>
           <tbody>
             {campaigns.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showExtra ? 11 : 7}
+                  colSpan={11}
                   className="px-4 py-12 text-center text-white/50"
                 >
                   Nenhuma campanha encontrada
@@ -123,21 +110,17 @@ export default function CampaignTable({ campaigns, adGroups, level }: Props) {
                 return (
                   <Fragment key={campaign.name}>
                     <tr
-                      className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
-                        showExtra ? "cursor-pointer" : ""
-                      }`}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
                       onClick={() => toggleExpand(campaign.name)}
                     >
-                      {showExtra && (
-                        <td className="px-4 py-3">
-                          {groups.length > 0 &&
-                            (isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-white/40" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-white/40" />
-                            ))}
-                        </td>
-                      )}
+                      <td className="px-4 py-3">
+                        {groups.length > 0 &&
+                          (isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-white/40" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-white/40" />
+                          ))}
+                      </td>
                       <td className="px-4 py-3 font-medium">{campaign.name}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={campaign.status} />
@@ -157,26 +140,21 @@ export default function CampaignTable({ campaigns, adGroups, level }: Props) {
                       <td className="px-4 py-3 text-right">
                         {formatCurrency(campaign.spend)}
                       </td>
-                      {showExtra && (
-                        <>
-                          <td className="px-4 py-3 text-right">
-                            {campaign.conversions.toLocaleString("pt-BR")}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {formatCurrency(campaign.conversionsValue)}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {(campaign.searchImpressionShare * 100).toFixed(1) + "%"}
-                          </td>
-                        </>
-                      )}
+                      <td className="px-4 py-3 text-right">
+                        {campaign.conversions.toLocaleString("pt-BR")}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCurrency(campaign.conversionsValue)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {(campaign.searchImpressionShare * 100).toFixed(1) + "%"}
+                      </td>
                     </tr>
 
-                    {showExtra &&
-                      isExpanded &&
+                    {isExpanded &&
                       groups.map((ag) => (
                         <tr
-                          key={ag.id}
+                          key={`${campaign.name}-${ag.name}`}
                           className="border-b border-white/5 bg-white/[0.02]"
                         >
                           <td className="px-4 py-3" />

@@ -16,12 +16,12 @@ export async function GET(
     // Check ownership
     const automation = await prisma.automation.findUnique({ where: { id } });
     if (!automation) {
-      log.warn("Automacao nao encontrada", { id });
-      return Response.json({ error: "Automacao nao encontrada" }, { status: 404 });
+      log.warn("Automação não encontrada", { id });
+      return Response.json({ error: "Automação não encontrada" }, { status: 404 });
     }
     if (session.role !== "admin" && automation.userId !== session.id) {
-      log.warn("Sem permissao para ver logs", { id, userId: session.id });
-      return Response.json({ error: "Sem permissao" }, { status: 403 });
+      log.warn("Sem permissão para ver logs", { id, userId: session.id });
+      return Response.json({ error: "Sem permissão" }, { status: 403 });
     }
 
     const logs = await prisma.automationLog.findMany({

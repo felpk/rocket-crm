@@ -364,8 +364,8 @@ async function gadsFetch(
       googleStatus: structuredError?.status,
       hint: res.status === 403
         ? structuredError?.errorCode?.includes("CUSTOMER_NOT_ENABLED")
-          ? "CAUSA: conta Google Ads nao ativada. Usuario precisa finalizar setup em ads.google.com (ToS + billing)."
-          : "PROVAVEL CAUSA: developer token nao tem permissao para esta conta, ou conta nao esta ativada. " +
+          ? "CAUSA: conta Google Ads não ativada. Usuário precisa finalizar setup em ads.google.com (ToS + billing)."
+          : "PROVÁVEL CAUSA: developer token não tem permissão para esta conta, ou conta não está ativada. " +
             "Verifique se a conta completou o setup em ads.google.com e se esta vinculada ao MCC do developer token."
         : res.status === 401
         ? "Token OAuth expirado ou revogado. Tentar refresh."
@@ -1244,12 +1244,12 @@ export async function validateAccountAccess(
       },
       loginCustomerId || undefined
     );
-    log.info("Validacao OK — acesso confirmado", { customerId: cleanId });
+    log.info("Validação OK — acesso confirmado", { customerId: cleanId });
     return { valid: true };
   } catch (err) {
     const errStr = String(err);
     const parsedError = parseGoogleAdsError(errStr);
-    log.warn("Validacao falhou — sem acesso a conta", {
+    log.warn("Validação falhou — sem acesso a conta", {
       customerId: cleanId,
       loginCustomerId,
       errorCode: parsedError.code,

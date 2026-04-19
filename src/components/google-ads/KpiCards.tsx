@@ -11,8 +11,6 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
-type Level = "basico" | "detalhado" | "completo";
-
 interface Summary {
   impressions: number;
   clicks: number;
@@ -26,7 +24,6 @@ interface Summary {
 
 interface Props {
   summary: Summary | null;
-  level: Level;
 }
 
 interface CardDef {
@@ -36,7 +33,7 @@ interface CardDef {
   getValue: (s: Summary) => string;
 }
 
-const BASE_CARDS: CardDef[] = [
+const CARDS: CardDef[] = [
   {
     label: "Impressões",
     icon: Eye,
@@ -61,9 +58,6 @@ const BASE_CARDS: CardDef[] = [
     color: "text-accent",
     getValue: (s) => formatCurrency(s.spend),
   },
-];
-
-const EXTRA_CARDS: CardDef[] = [
   {
     label: "Conversões",
     icon: Target,
@@ -84,17 +78,10 @@ const EXTRA_CARDS: CardDef[] = [
   },
 ];
 
-export default function KpiCards({ summary, level }: Props) {
-  const showExtra = level === "detalhado" || level === "completo";
-  const cards = showExtra ? [...BASE_CARDS, ...EXTRA_CARDS] : BASE_CARDS;
-
-  const gridCols = showExtra
-    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8"
-    : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8";
-
+export default function KpiCards({ summary }: Props) {
   return (
-    <div className={gridCols}>
-      {cards.map((card) => {
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+      {CARDS.map((card) => {
         const Icon = card.icon;
         const value = summary ? card.getValue(summary) : "0";
 

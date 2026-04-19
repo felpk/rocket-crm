@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Link2, Link2Off, CheckCircle, AlertCircle } from "lucide-react";
+import { Settings, Link2, Link2Off, CheckCircle, AlertCircle, Clock } from "lucide-react";
 
 interface GoogleAdsStatus {
   connected: boolean;
@@ -11,9 +11,14 @@ interface GoogleAdsStatus {
   accountName?: string;
 }
 
+interface UserSession {
+  role: string;
+}
+
 export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [gadsStatus, setGadsStatus] = useState<GoogleAdsStatus | null>(null);
+  const [session, setSession] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
 
@@ -21,19 +26,27 @@ export default function SettingsPage() {
   const error = searchParams.get("error");
   const errorDetail = searchParams.get("detail");
 
+  const isAdmin = session?.role === "admin";
+
   useEffect(() => {
-    fetchGadsStatus();
+    Promise.all([fetchSession(), fetchGadsStatus()]).then(() => setLoading(false));
   }, []);
 
+  async function fetchSession() {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) setSession(await res.json());
+    } catch {}
+  }
+
   async function fetchGadsStatus() {
-    setLoading(true);
     try {
       const res = await fetch("/api/google-ads/status");
       if (res.ok) setGadsStatus(await res.json());
+      else setGadsStatus({ connected: false });
     } catch {
       setGadsStatus({ connected: false });
     }
-    setLoading(false);
   }
 
   async function handleConnect() {
@@ -114,56 +127,76 @@ export default function SettingsPage() {
 
         {loading ? (
           <p className="text-white/50 text-sm">Verificando conexão...</p>
-        ) : gadsStatus?.connected ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Link2 className="w-5 h-5 text-success" />
-              <div>
-                <p className="font-medium">Conectado</p>
-                <p className="text-sm text-white/50">
-                  Customer ID: {gadsStatus.customerId}
-                  {gadsStatus.accountName && ` — ${gadsStatus.accountName}`}
-                </p>
+        ) : isAdmin ? (
+          /* --- ADMIN VIEW --- */
+          gadsStatus?.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Link2 className="w-5 h-5 text-success" />
+                <div>
+                  <p className="font-medium">MCC Conectado</p>
+                  <p className="text-sm text-white/50">
+                    Customer ID: {gadsStatus.customerId}
+                    {gadsStatus.accountName && ` — ${gadsStatus.accountName}`}
+                  </p>
+                </div>
               </div>
+              <p className="text-xs text-white/40">
+                Gerencie a atribuição de contas aos clientes no Painel Administrativo.
+              </p>
+              <button
+                onClick={handleDisconnect}
+                className="flex items-center gap-2 bg-error/20 hover:bg-error/30 text-error px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                <Link2Off className="w-4 h-4" />
+                Desconectar
+              </button>
             </div>
-            <button
-              onClick={handleDisconnect}
-              className="flex items-center gap-2 bg-error/20 hover:bg-error/30 text-error px-4 py-2 rounded-lg text-sm transition-colors"
-            >
-              <Link2Off className="w-4 h-4" />
-              Desconectar
-            </button>
-          </div>
-        ) : gadsStatus?.assignedByAdmin ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Link2 className="w-5 h-5 text-success" />
-              <div>
-                <p className="font-medium">Conectado pela Rocket</p>
-                <p className="text-sm text-white/50">
-                  Conta: {gadsStatus.accountName || gadsStatus.customerId}
-                </p>
-              </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-white/60">
+                Conecte a conta MCC do Google Ads para gerenciar as campanhas dos clientes.
+              </p>
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                className="flex items-center gap-2 bg-accent hover:bg-accent/80 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <Link2 className="w-4 h-4" />
+                {connecting ? "Redirecionando..." : "Conectar Google Ads (MCC)"}
+              </button>
             </div>
-            <p className="text-xs text-white/40">
-              Sua conta Google Ads foi configurada pelo administrador. Acesse a pagina Google Ads para ver suas metricas.
-            </p>
-          </div>
+          )
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-white/60">
-              Conecte sua conta Google Ads para visualizar métricas de campanhas
-              diretamente no CRM.
-            </p>
-            <button
-              onClick={handleConnect}
-              disabled={connecting}
-              className="flex items-center gap-2 bg-accent hover:bg-accent/80 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              <Link2 className="w-4 h-4" />
-              {connecting ? "Redirecionando..." : "Conectar Google Ads"}
-            </button>
-          </div>
+          /* --- CLIENT VIEW --- */
+          gadsStatus?.connected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Link2 className="w-5 h-5 text-success" />
+                <div>
+                  <p className="font-medium">Conectado pela Rocket</p>
+                  <p className="text-sm text-white/50">
+                    Conta: {gadsStatus.accountName || gadsStatus.customerId}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-white/40">
+                Sua conta Google Ads foi configurada pelo administrador. Acesse a página Google Ads para ver suas métricas.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-white/30" />
+                <div>
+                  <p className="font-medium text-white/60">Aguardando configuração</p>
+                  <p className="text-sm text-white/40">
+                    O administrador da Rocket irá configurar sua conta Google Ads em breve.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
         )}
       </div>
 

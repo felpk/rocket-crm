@@ -60,23 +60,23 @@ function formatDateTime(dateStr: string): string {
 
 const resourceTypeLabels: Record<string, string> = {
   CAMPAIGN: "Campanha",
-  AD: "Anuncio",
+  AD: "Anúncio",
   AD_GROUP: "Grupo",
-  CAMPAIGN_BUDGET: "Orcamento",
+  CAMPAIGN_BUDGET: "Orçamento",
   AD_GROUP_CRITERION: "Palavra-chave",
   AD_GROUP_BID_MODIFIER: "Ajuste de Lance",
 };
 
 const operationLabels: Record<string, string> = {
-  CREATE: "Criacao",
-  UPDATE: "Alteracao",
-  REMOVE: "Remocao",
+  CREATE: "Criação",
+  UPDATE: "Alteração",
+  REMOVE: "Remoção",
 };
 
 const recommendationTypeLabels: Record<string, string> = {
   KEYWORD: "Palavra-chave",
-  TARGET_CPA_OPT_IN: "CPA Automatico",
-  TEXT_AD: "Anuncio de Texto",
+  TARGET_CPA_OPT_IN: "CPA Automático",
+  TEXT_AD: "Anúncio de Texto",
   SITELINK_EXTENSION: "Sitelink",
 };
 
@@ -112,18 +112,18 @@ export default function InsightsPanel({
 }: Props) {
   return (
     <div>
-      {/* Performance Diaria */}
+      {/* Performance Diária */}
       <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">Performance Diaria</h3>
+        <h3 className="text-lg font-semibold mb-4">Performance Diária</h3>
         <div className="bg-card rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 text-white/60">
                 <th className="text-left p-3 font-medium">Data</th>
-                <th className="text-right p-3 font-medium">Impressoes</th>
+                <th className="text-right p-3 font-medium">Impressões</th>
                 <th className="text-right p-3 font-medium">Cliques</th>
                 <th className="text-right p-3 font-medium">Custo</th>
-                <th className="text-right p-3 font-medium">Conversoes</th>
+                <th className="text-right p-3 font-medium">Conversões</th>
                 <th className="text-right p-3 font-medium">Valor</th>
               </tr>
             </thead>
@@ -154,9 +154,9 @@ export default function InsightsPanel({
         </div>
       </div>
 
-      {/* Orcamentos */}
+      {/* Orçamentos */}
       <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">Orcamentos</h3>
+        <h3 className="text-lg font-semibold mb-4">Orçamentos</h3>
         <div className="bg-card rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -164,10 +164,10 @@ export default function InsightsPanel({
                 <th className="text-left p-3 font-medium">Campanha</th>
                 <th className="text-left p-3 font-medium">Status</th>
                 <th className="text-right p-3 font-medium">
-                  Orcamento Diario
+                  Orçamento Diario
                 </th>
                 <th className="text-right p-3 font-medium">Gasto</th>
-                <th className="text-left p-3 font-medium">Utilizacao</th>
+                <th className="text-left p-3 font-medium">Utilização</th>
               </tr>
             </thead>
             <tbody>
@@ -206,10 +206,10 @@ export default function InsightsPanel({
         </div>
       </div>
 
-      {/* Historico de Alteracoes */}
+      {/* Histórico de Alterações */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-4">
-          Historico de Alteracoes
+          Histórico de Alterações
         </h3>
         <div className="bg-card rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -217,8 +217,8 @@ export default function InsightsPanel({
               <tr className="border-b border-white/10 text-white/60">
                 <th className="text-left p-3 font-medium">Data/Hora</th>
                 <th className="text-left p-3 font-medium">Tipo</th>
-                <th className="text-left p-3 font-medium">Operacao</th>
-                <th className="text-left p-3 font-medium">Usuario</th>
+                <th className="text-left p-3 font-medium">Operação</th>
+                <th className="text-left p-3 font-medium">Usuário</th>
               </tr>
             </thead>
             <tbody>
@@ -242,10 +242,10 @@ export default function InsightsPanel({
         </div>
       </div>
 
-      {/* Recomendacoes do Google */}
+      {/* Recomendações do Google */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-4">
-          Recomendacoes do Google
+          Recomendações do Google
         </h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {recommendations.map((rec, i) => {
@@ -264,7 +264,7 @@ export default function InsightsPanel({
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-xs text-white/60">
                   <div>
-                    <p className="text-white/40">Impressoes atuais</p>
+                    <p className="text-white/40">Impressões atuais</p>
                     <p className="text-white">
                       {rec.impactImpressions.toLocaleString("pt-BR")}
                     </p>

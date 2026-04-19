@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
     );
     if (!validation.valid) {
       const errorCode = validation.error.code;
-      log.error("Validacao de acesso falhou — conta nao sera salva", {
+      log.error("Validação de acesso falhou — conta não será salva", {
         userId,
         customerId,
         loginCustomerId,

@@ -15,12 +15,12 @@ export async function PATCH(
 
     const automation = await prisma.automation.findUnique({ where: { id } });
     if (!automation) {
-      log.warn("Automacao nao encontrada", { id });
-      return Response.json({ error: "Automacao nao encontrada" }, { status: 404 });
+      log.warn("Automação não encontrada", { id });
+      return Response.json({ error: "Automação não encontrada" }, { status: 404 });
     }
     if (session.role !== "admin" && automation.userId !== session.id) {
-      log.warn("Sem permissao para editar automacao", { id, userId: session.id });
-      return Response.json({ error: "Sem permissao" }, { status: 403 });
+      log.warn("Sem permissão para editar automação", { id, userId: session.id });
+      return Response.json({ error: "Sem permissão" }, { status: 403 });
     }
 
     const data = await req.json();
@@ -40,14 +40,14 @@ export async function PATCH(
       },
     });
 
-    log.info("Automacao atualizada", { id, changes: Object.keys(data) });
+    log.info("Automação atualizada", { id, changes: Object.keys(data) });
     return Response.json({
       ...updated,
       triggerConfig: JSON.parse(updated.triggerConfig),
       actions: JSON.parse(updated.actions),
     });
   } catch (err) {
-    log.error("Erro ao atualizar automacao", { id, error: String(err) });
+    log.error("Erro ao atualizar automação", { id, error: String(err) });
     return Response.json({ error: "Erro interno" }, { status: 500 });
   }
 }
@@ -63,19 +63,19 @@ export async function DELETE(
 
     const automation = await prisma.automation.findUnique({ where: { id } });
     if (!automation) {
-      log.warn("Automacao nao encontrada para exclusao", { id });
-      return Response.json({ error: "Automacao nao encontrada" }, { status: 404 });
+      log.warn("Automação não encontrada para exclusão", { id });
+      return Response.json({ error: "Automação não encontrada" }, { status: 404 });
     }
     if (session.role !== "admin" && automation.userId !== session.id) {
-      log.warn("Sem permissao para excluir automacao", { id, userId: session.id });
-      return Response.json({ error: "Sem permissao" }, { status: 403 });
+      log.warn("Sem permissão para excluir automação", { id, userId: session.id });
+      return Response.json({ error: "Sem permissão" }, { status: 403 });
     }
 
     await prisma.automation.delete({ where: { id } });
-    log.info("Automacao excluida", { id });
+    log.info("Automação excluída", { id });
     return Response.json({ ok: true });
   } catch (err) {
-    log.error("Erro ao excluir automacao", { id, error: String(err) });
+    log.error("Erro ao excluir automação", { id, error: String(err) });
     return Response.json({ error: "Erro interno" }, { status: 500 });
   }
 }
