@@ -19,17 +19,10 @@ export async function GET() {
   }
 
   try {
-    // Find admin user
-    const admin = await prisma.user.findFirst({
-      where: { role: "admin" },
-      select: { id: true },
-    });
-    if (!admin) {
-      return Response.json({ error: "Admin não encontrado" }, { status: 404 });
-    }
-
-    const adminConnection = await prisma.googleAdsConnection.findUnique({
-      where: { userId: admin.id },
+    // Find any admin with an active Google Ads connection (MCC)
+    const adminConnection = await prisma.googleAdsConnection.findFirst({
+      where: { user: { role: "admin" } },
+      include: { user: { select: { id: true } } },
     });
     if (!adminConnection) {
       return Response.json({
@@ -39,10 +32,12 @@ export async function GET() {
       });
     }
 
+    const adminId = adminConnection.user.id;
+
     // Get managed accounts — prefer fresh API call, fallback to cached
     let managedAccounts: Array<{ id: string; name: string }> = [];
 
-    const token = await getValidToken(admin.id);
+    const token = await getValidToken(adminId);
     if (token && adminConnection.loginCustomerId) {
       try {
         const fresh = await listManagedAccounts(
@@ -55,7 +50,7 @@ export async function GET() {
 
         // Update cache
         await prisma.googleAdsConnection.update({
-          where: { userId: admin.id },
+          where: { userId: adminId },
           data: { managedAccounts: JSON.stringify(managedAccounts) },
         });
       } catch (err) {
@@ -146,20 +141,12 @@ export async function POST(req: Request) {
       return Response.json({ success: true, action: "unassigned" });
     }
 
-    // Find admin connection for tokens
-    const admin = await prisma.user.findFirst({
-      where: { role: "admin" },
-      select: { id: true },
-    });
-    if (!admin) {
-      return Response.json({ error: "Admin não encontrado" }, { status: 404 });
-    }
-
-    const adminConnection = await prisma.googleAdsConnection.findUnique({
-      where: { userId: admin.id },
+    // Find any admin with an active Google Ads connection (MCC)
+    const adminConnection = await prisma.googleAdsConnection.findFirst({
+      where: { user: { role: "admin" } },
     });
     if (!adminConnection) {
-      return Response.json({ error: "Admin não conectou Google Ads" }, { status: 400 });
+      return Response.json({ error: "Nenhum admin conectou Google Ads" }, { status: 400 });
     }
 
     // Find account name from managed accounts
