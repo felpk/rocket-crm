@@ -35,7 +35,10 @@ export default function SettingsPage() {
   async function fetchSession() {
     try {
       const res = await fetch("/api/auth/me");
-      if (res.ok) setSession(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setSession(data.user || data);
+      }
     } catch {}
   }
 
