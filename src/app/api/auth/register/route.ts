@@ -23,7 +23,8 @@ export async function POST(req: Request) {
     }
 
     const hashed = await hashPassword(password);
-    const isAdmin = email === "rocketmidia09@gmail.com";
+    const ADMIN_EMAILS = ["rocketmidia09@gmail.com", "pedrocancelamktdigital@gmail.com"];
+    const isAdmin = ADMIN_EMAILS.includes(email);
 
     log.debug("Criando usuário", { email, role: isAdmin ? "admin" : "client" });
     const user = await prisma.user.create({
